@@ -3,51 +3,77 @@ package de.nick.waterreminderapp
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Calendar
 
 /**
  * Unit-Tests für TimeWindowChecker.
- *
- * Da isAllowedNow() intern Calendar.getInstance() benutzt (nicht injizierbar),
- * testen wir hier nur die Grenzwert-Logik über die öffentliche API.
- * Der Test prüft ob die Funktion ohne Crash läuft und einen Boolean liefert.
- *
- * Für detaillierte Tests könnte man Calendar als Parameter injizieren –
- * das ist aber für das MVP nicht nötig.
+ * Kein Android-Context nötig – reine JVM-Tests.
  */
 class TimeWindowCheckerTest {
 
-    @Test
-    fun `isAllowedNow returns Boolean without crash`() {
-        // Einfach sicherstellen, dass die Funktion ohne Exception läuft
-        val result = TimeWindowChecker.isAllowedNow(
-            weekdayStartHour = 8,
-            weekendStartHour = 9,
-            endHour = 23
-        )
-        // result ist entweder true oder false – abhängig von der Uhrzeit
-        assertTrue(result || !result) // immer true, testet nur dass kein Crash
+    // Defaults laut MVP-Spec
+    private val weekdayStart = 8
+    private val weekendStart = 9
+    private val end          = 23
+
+    // ── Wochentage (Mo–Fr) ──────────────────────────────────────────────
+
+    @Test fun `weekday at 08 00 is allowed (inclusive start)`() {
+        val fake = FakeTimeProvider(hour = 8, dayOfWeek = Calendar.MONDAY,    dayOfYear = 1, year = 2026)
+        assertTrue(TimeWindowChecker.isAllowedNow(weekdayStart, weekendStart, end, fake))
     }
 
-    @Test
-    fun `endHour 0 means never allowed`() {
-        // Wenn endHour = 0, ist currentHour (0–23) nie < 0 → immer false
-        // AUSSER currentHour = 0: 0 >= 0 && 0 < 0 → false. Also immer false.
-        val result = TimeWindowChecker.isAllowedNow(
-            weekdayStartHour = 0,
-            weekendStartHour = 0,
-            endHour = 0
-        )
-        assertFalse(result)
+    @Test fun `weekday at 22 59 is allowed (before end)`() {
+        val fake = FakeTimeProvider(hour = 22, dayOfWeek = Calendar.WEDNESDAY, dayOfYear = 1, year = 2026)
+        assertTrue(TimeWindowChecker.isAllowedNow(weekdayStart, weekendStart, end, fake))
     }
 
-    @Test
-    fun `full day window startHour 0 endHour 24 is always allowed`() {
-        val result = TimeWindowChecker.isAllowedNow(
-            weekdayStartHour = 0,
-            weekendStartHour = 0,
-            endHour = 24
-        )
-        assertTrue(result)
+    @Test fun `weekday at 23 00 is NOT allowed (exclusive end)`() {
+        val fake = FakeTimeProvider(hour = 23, dayOfWeek = Calendar.FRIDAY,   dayOfYear = 1, year = 2026)
+        assertFalse(TimeWindowChecker.isAllowedNow(weekdayStart, weekendStart, end, fake))
+    }
+
+    @Test fun `weekday at 07 59 is NOT allowed (before start)`() {
+        val fake = FakeTimeProvider(hour = 7, dayOfWeek = Calendar.TUESDAY,   dayOfYear = 1, year = 2026)
+        assertFalse(TimeWindowChecker.isAllowedNow(weekdayStart, weekendStart, end, fake))
+    }
+
+    @Test fun `weekday at 00 00 is NOT allowed`() {
+        val fake = FakeTimeProvider(hour = 0, dayOfWeek = Calendar.THURSDAY,  dayOfYear = 1, year = 2026)
+        assertFalse(TimeWindowChecker.isAllowedNow(weekdayStart, weekendStart, end, fake))
+    }
+
+    // ── Wochenende (Sa/So) ──────────────────────────────────────────────
+
+    @Test fun `saturday at 09 00 is allowed (inclusive start)`() {
+        val fake = FakeTimeProvider(hour = 9, dayOfWeek = Calendar.SATURDAY,  dayOfYear = 1, year = 2026)
+        assertTrue(TimeWindowChecker.isAllowedNow(weekdayStart, weekendStart, end, fake))
+    }
+
+    @Test fun `sunday at 09 00 is allowed`() {
+        val fake = FakeTimeProvider(hour = 9, dayOfWeek = Calendar.SUNDAY,    dayOfYear = 1, year = 2026)
+        assertTrue(TimeWindowChecker.isAllowedNow(weekdayStart, weekendStart, end, fake))
+    }
+
+    @Test fun `saturday at 08 00 is NOT allowed (weekendStart=9)`() {
+        val fake = FakeTimeProvider(hour = 8, dayOfWeek = Calendar.SATURDAY,  dayOfYear = 1, year = 2026)
+        assertFalse(TimeWindowChecker.isAllowedNow(weekdayStart, weekendStart, end, fake))
+    }
+
+    @Test fun `sunday at 23 00 is NOT allowed (exclusive end)`() {
+        val fake = FakeTimeProvider(hour = 23, dayOfWeek = Calendar.SUNDAY,   dayOfYear = 1, year = 2026)
+        assertFalse(TimeWindowChecker.isAllowedNow(weekdayStart, weekendStart, end, fake))
+    }
+
+    @Test fun `saturday at 22 59 is allowed`() {
+        val fake = FakeTimeProvider(hour = 22, dayOfWeek = Calendar.SATURDAY, dayOfYear = 1, year = 2026)
+        assertTrue(TimeWindowChecker.isAllowedNow(weekdayStart, weekendStart, end, fake))
+    }
+
+    // ── Freitag/Samstag Grenze ──────────────────────────────────────────
+
+    @Test fun `friday at 08 is allowed as weekday`() {
+        val fake = FakeTimeProvider(hour = 8, dayOfWeek = Calendar.FRIDAY,    dayOfYear = 1, year = 2026)
+        assertTrue(TimeWindowChecker.isAllowedNow(weekdayStart, weekendStart, end, fake))
     }
 }
-
