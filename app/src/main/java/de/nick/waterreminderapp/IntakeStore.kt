@@ -125,5 +125,13 @@ class IntakeStore(private val context: Context) {
             prefs[CONGRATS_SENT] ?: false
         }
     }
+
+    // -----------------------------------------------------------------------
+    // 2g. isCongratsSentToday – einmalige suspend-Abfrage (kein Flow nötig)
+    //     Liest genau einen Wert aus congratsSentTodayFlow.
+    //     Praktisch wenn kein dauerhaftes Beobachten gewünscht ist,
+    //     z.B. in BroadcastReceiver oder Worker.
+    // -----------------------------------------------------------------------
+    suspend fun isCongratsSentToday(): Boolean = congratsSentTodayFlow.first()
 }
 
