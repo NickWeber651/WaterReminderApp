@@ -34,8 +34,10 @@ class IntakeStore(private val context: Context) {
     private companion object Keys {
         val TOTAL_ML_TODAY  = intPreferencesKey("total_ml_today")
         val SAVED_DAY       = intPreferencesKey("saved_day")
+        val SAVED_YEAR      = intPreferencesKey("saved_year")
         val CONGRATS_SENT   = booleanPreferencesKey("congrats_sent")
         val CONGRATS_DAY    = intPreferencesKey("congrats_day")
+        val CONGRATS_YEAR   = intPreferencesKey("congrats_year")
     }
 
     // -----------------------------------------------------------------------
@@ -44,6 +46,11 @@ class IntakeStore(private val context: Context) {
     // DAY_OF_YEAR ist 1-366 und ändert sich täglich → perfekter Tages-Reset
     // -----------------------------------------------------------------------
     private fun todayDayOfYear(): Int = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
+    private fun todayYear(): Int     = Calendar.getInstance().get(Calendar.YEAR)
+
+    // Prüft ob gespeicherter Tag+Jahr = heute
+    private fun isSameDay(savedDay: Int, savedYear: Int): Boolean =
+        savedDay == todayDayOfYear() && savedYear == todayYear()
 
     // -----------------------------------------------------------------------
     // 2b. totalMlTodayFlow – reaktiver Datenstrom des heutigen Trinkwerts
@@ -57,8 +64,9 @@ class IntakeStore(private val context: Context) {
     //     der tatsächliche Schreibreset passiert in addMl() und markCongratsSent().
     // -----------------------------------------------------------------------
     val totalMlTodayFlow: Flow<Int> = context.intakeStore.data.map { prefs ->
-        val savedDay = prefs[SAVED_DAY] ?: 0
-        if (savedDay != todayDayOfYear()) {
+        val savedDay  = prefs[SAVED_DAY]  ?: 0
+        val savedYear = prefs[SAVED_YEAR] ?: 0
+        if (!isSameDay(savedDay, savedYear)) {
             0   // neuer Tag → virtuell 0 liefern
         } else {
             prefs[TOTAL_ML_TODAY] ?: 0
@@ -77,14 +85,17 @@ class IntakeStore(private val context: Context) {
     // -----------------------------------------------------------------------
     suspend fun addMl(ml: Int) {
         context.intakeStore.edit { prefs ->
-            val today = todayDayOfYear()
-            val savedDay = prefs[SAVED_DAY] ?: 0
+            val today     = todayDayOfYear()
+            val year      = todayYear()
+            val savedDay  = prefs[SAVED_DAY]  ?: 0
+            val savedYear = prefs[SAVED_YEAR] ?: 0
 
             // Tageswechsel → Werte zurücksetzen
-            val currentTotal = if (savedDay != today) 0 else (prefs[TOTAL_ML_TODAY] ?: 0)
+            val currentTotal = if (!isSameDay(savedDay, savedYear)) 0 else (prefs[TOTAL_ML_TODAY] ?: 0)
 
             prefs[TOTAL_ML_TODAY] = currentTotal + ml
             prefs[SAVED_DAY]      = today
+            prefs[SAVED_YEAR]     = year
         }
     }
 
@@ -110,6 +121,7 @@ class IntakeStore(private val context: Context) {
         context.intakeStore.edit { prefs ->
             prefs[CONGRATS_SENT] = true
             prefs[CONGRATS_DAY]  = todayDayOfYear()
+            prefs[CONGRATS_YEAR] = todayYear()
         }
     }
 
@@ -118,8 +130,9 @@ class IntakeStore(private val context: Context) {
     //     HEUTE schon gesendet wurde (automatischer Tages-Reset)
     // -----------------------------------------------------------------------
     val congratsSentTodayFlow: Flow<Boolean> = context.intakeStore.data.map { prefs ->
-        val savedDay = prefs[CONGRATS_DAY] ?: 0
-        if (savedDay != todayDayOfYear()) {
+        val savedDay  = prefs[CONGRATS_DAY]  ?: 0
+        val savedYear = prefs[CONGRATS_YEAR] ?: 0
+        if (!isSameDay(savedDay, savedYear)) {
             false   // neuer Tag → Glückwunsch noch nicht gesendet
         } else {
             prefs[CONGRATS_SENT] ?: false
