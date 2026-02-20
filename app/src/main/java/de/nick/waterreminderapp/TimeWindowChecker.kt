@@ -24,19 +24,15 @@ object TimeWindowChecker {
     fun isAllowedNow(
         weekdayStartHour: Int,
         weekendStartHour: Int,
-        endHour: Int
+        endHour: Int,
+        timeProvider: TimeProvider = SystemTimeProvider   // default: Echtzeit
     ): Boolean {
-        val cal        = Calendar.getInstance()
-        val dayOfWeek  = cal.get(Calendar.DAY_OF_WEEK)
-        val currentHour = cal.get(Calendar.HOUR_OF_DAY)
+        val dayOfWeek   = timeProvider.currentDayOfWeek()
+        val currentHour = timeProvider.currentHour()
 
-        // Wochenende: Samstag (7) oder Sonntag (1)
         val isWeekend = dayOfWeek == Calendar.SATURDAY || dayOfWeek == Calendar.SUNDAY
-
         val startHour = if (isWeekend) weekendStartHour else weekdayStartHour
 
-        // startHour inklusiv, endHour exklusiv
         return currentHour >= startHour && currentHour < endHour
     }
 }
-

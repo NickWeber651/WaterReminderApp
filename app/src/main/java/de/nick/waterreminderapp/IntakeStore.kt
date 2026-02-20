@@ -10,7 +10,6 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import java.util.Calendar
 
 // ---------------------------------------------------------------------------
 // 1. Eigener DataStore – getrennt von "settings", heißt "intake"
@@ -21,7 +20,10 @@ private val Context.intakeStore: DataStore<Preferences> by preferencesDataStore(
 // ---------------------------------------------------------------------------
 // 2. IntakeStore – verwaltet den heutigen Trinkfortschritt
 // ---------------------------------------------------------------------------
-class IntakeStore(private val context: Context) {
+class IntakeStore(
+    private val context: Context,
+    private val timeProvider: TimeProvider = SystemTimeProvider
+) {
 
     // -----------------------------------------------------------------------
     // 2a. Keys
@@ -45,8 +47,8 @@ class IntakeStore(private val context: Context) {
     // Calendar.getInstance() funktioniert ab API 1 → sicher für minSdk 24
     // DAY_OF_YEAR ist 1-366 und ändert sich täglich → perfekter Tages-Reset
     // -----------------------------------------------------------------------
-    private fun todayDayOfYear(): Int = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
-    private fun todayYear(): Int     = Calendar.getInstance().get(Calendar.YEAR)
+    private fun todayDayOfYear(): Int = timeProvider.currentDayOfYear()
+    private fun todayYear(): Int     = timeProvider.currentYear()
 
     // Prüft ob gespeicherter Tag+Jahr = heute
     private fun isSameDay(savedDay: Int, savedYear: Int): Boolean =

@@ -23,7 +23,11 @@ import kotlinx.coroutines.flow.first
 // ---------------------------------------------------------------------------
 class WaterReminderWorker(
     context: Context,
-    params: WorkerParameters
+    params: WorkerParameters,
+    // NotificationSender injizierbar für Tests; Default: RealNotificationSender
+    private val notificationSender: NotificationSender =
+        RealNotificationSender(NotificationHelper(context)),
+    private val timeProvider: TimeProvider = SystemTimeProvider
 ) : CoroutineWorker(context, params) {
 
     companion object {
@@ -50,7 +54,8 @@ class WaterReminderWorker(
         val inTimeWindow = TimeWindowChecker.isAllowedNow(
             weekdayStartHour = settings.weekdayStartHour,
             weekendStartHour = settings.weekendStartHour,
-            endHour          = settings.endHour
+            endHour          = settings.endHour,
+            timeProvider     = timeProvider
         )
 
         if (!inTimeWindow) {
@@ -62,7 +67,7 @@ class WaterReminderWorker(
         // 3. Tagesziel prüfen
         //    hasReachedGoal() liest intern totalMlTodayFlow.first()
         // -------------------------------------------------------------------
-        val intakeStore  = IntakeStore(applicationContext)
+        val intakeStore  = IntakeStore(applicationContext, timeProvider)
         val goalReached  = intakeStore.hasReachedGoal(settings.goalMl)
 
         if (goalReached) {
@@ -80,12 +85,7 @@ class WaterReminderWorker(
 
         val reminderId = System.currentTimeMillis()   // eindeutige ID pro Aufruf
 
-        NotificationHelper(applicationContext)
-            .showReminderNotification(
-                reminderId   = reminderId,
-                allowSnooze  = allowSnooze
-            )
-
+        notificationSender.sendReminder(reminderId, allowSnooze)
         return Result.success()
     }
 }
