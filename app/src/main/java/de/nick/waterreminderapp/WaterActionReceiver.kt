@@ -10,6 +10,7 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
@@ -29,9 +30,6 @@ class WaterActionReceiver : BroadcastReceiver() {
         const val ACTION_DRANK_250  = "de.nick.waterreminderapp.ACTION_DRANK_250"
         const val ACTION_SNOOZE_15  = "de.nick.waterreminderapp.ACTION_SNOOZE_15"
         const val EXTRA_REMINDER_ID = "extra_reminder_id"
-
-        // Standard-Tagesziel falls SettingsStore noch nicht gelesen werden kann
-        private const val DEFAULT_GOAL_ML = 2000
     }
 
     // -----------------------------------------------------------------------
@@ -75,8 +73,11 @@ class WaterActionReceiver : BroadcastReceiver() {
                 // 1. 250 ml hinzufügen
                 intakeStore.addMl(250)
 
-                // 2+3. Ziel erreicht UND Glückwunsch noch nicht gesendet?
-                val goalReached  = intakeStore.hasReachedGoal(DEFAULT_GOAL_ML)
+                // 2. Tagesziel aus Settings lesen
+                val goalMl = SettingsStore(context).settingsFlow.first().goalMl
+
+                // 3. Ziel erreicht UND Glückwunsch noch nicht gesendet?
+                val goalReached  = intakeStore.hasReachedGoal(goalMl)
                 val congratsSent = intakeStore.isCongratsSentToday()
 
                 if (goalReached && !congratsSent) {
