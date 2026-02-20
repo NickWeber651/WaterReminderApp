@@ -14,11 +14,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.WaterReminderApp">
         <receiver
-            android:name=".WaterActionReceiver"
+            android:name=".receiver.WaterActionReceiver"
             android:exported="false" />
 
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.WaterReminderApp">
