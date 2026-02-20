@@ -37,6 +37,11 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true   // Robolectric benötigt Android-Resources
+        }
+    }
 }
 
 dependencies {
@@ -57,4 +62,17 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // ── Unit-Test ──────────────────────────────────────────────────────────
+    // Coroutines Test: runTest, TestCoroutineDispatcher
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    // DataStore in-memory für Unit-Tests (kein echtes Filesystem nötig)
+    testImplementation("androidx.datastore:datastore-preferences-core:1.1.1")
+    // Robolectric: Android-Klassen (Context, WorkManager) auf JVM ausführen
+    testImplementation("org.robolectric:robolectric:4.12.2")
+    // WorkManager Test-Helper
+    testImplementation("androidx.work:work-testing:2.9.0")
+    // AndroidX Test Runner/Rules für Robolectric
+    testImplementation("androidx.test:core-ktx:1.6.1")
+    testImplementation("androidx.test.ext:junit-ktx:1.2.1")
 }
