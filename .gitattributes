@@ -1,0 +1,37 @@
+# ============================================================================
+# .gitattributes – Zeilenenden-Kontrolle für Cross-Platform (Windows + Linux CI)
+# ============================================================================
+
+# Standard: automatische Erkennung
+* text=auto
+
+# ── Shell / Unix-Skripte → IMMER LF (sonst /bin/sh Fehler auf Linux CI) ──
+*.sh            text eol=lf
+gradlew         text eol=lf
+
+# ── Windows Batch → CRLF erlaubt ──
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+
+# ── Quellcode → LF (konsistent für Diffs und Reviews) ──
+*.kt            text eol=lf
+*.kts           text eol=lf
+*.java          text eol=lf
+*.xml           text eol=lf
+*.json          text eol=lf
+*.properties    text eol=lf
+*.toml          text eol=lf
+*.md            text eol=lf
+
+# ── CI/CD Configs → LF ──
+*.yml           text eol=lf
+*.yaml          text eol=lf
+
+# ── Binärdateien → nicht anfassen ──
+*.jar           binary
+*.png           binary
+*.jpg           binary
+*.webp          binary
+*.ico           binary
+*.keystore      binary
+
