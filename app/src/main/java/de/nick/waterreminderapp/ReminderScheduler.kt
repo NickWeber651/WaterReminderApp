@@ -30,14 +30,16 @@ object ReminderScheduler {
     //   → Sinnvoll wenn der Nutzer das Intervall in den Settings ändert.
     //
     // PeriodicWorkRequestBuilder benötigt ein Minimum-Intervall von 15 Min.
-    // Wir nutzen 60 Min. (entspricht settings.intervalMinutes Default).
     //
     // inputData source="scheduled" → Worker weiß dass es kein Snooze ist
     //   → allowSnooze = true → Snooze-Button wird in der Notification gezeigt
     // -----------------------------------------------------------------------
-    fun start(context: Context) {
+    fun start(context: Context, intervalMinutes: Long = 60) {
+        // WorkManager Minimum: 15 Min. → sicherstellen
+        val safeInterval = intervalMinutes.coerceAtLeast(15)
+
         val workRequest = PeriodicWorkRequestBuilder<WaterReminderWorker>(
-            60, TimeUnit.MINUTES
+            safeInterval, TimeUnit.MINUTES
         )
             .setInputData(
                 workDataOf(WaterReminderWorker.KEY_SOURCE to "scheduled")
