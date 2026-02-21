@@ -108,6 +108,15 @@ fun SettingsScreen(
                 modifier        = Modifier.fillMaxWidth()
             )
 
+            val intervalValue = uiState.intervalMinutesInput.trim().toIntOrNull()
+            if (v.intervalMinutesError == null && intervalValue != null && intervalValue < 15) {
+                Text(
+                    text  = "⚡ Hinweis: Unter 15 Min. läuft der Reminder im OneTime-Modus und kann mehr Akku verbrauchen.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
             Spacer(Modifier.height(4.dp))
             Text("Zeitfenster", style = MaterialTheme.typography.titleMedium)
 
