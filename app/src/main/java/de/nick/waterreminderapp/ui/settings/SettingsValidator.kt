@@ -14,7 +14,7 @@ package de.nick.waterreminderapp.ui.settings
 object SettingsValidator {
 
     const val GOAL_ML_MIN          = 0
-    const val INTERVAL_MINUTES_MIN = 1
+    const val INTERVAL_MINUTES_MIN = 1   // < 15 min → OneTimeWorkRequest-Modus, >= 15 min → PeriodicWorkRequest
     const val HOUR_MIN             = 0
     const val HOUR_MAX             = 23
 
