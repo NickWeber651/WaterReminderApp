@@ -1,4 +1,4 @@
-package de.nick.waterreminderapp.ui
+package de.nick.waterreminderapp.ui.home
 
 import android.Manifest
 import android.os.Build

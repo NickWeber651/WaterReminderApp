@@ -1,11 +1,11 @@
-package de.nick.waterreminderapp.ui
+package de.nick.waterreminderapp.ui.navigation
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Einfacher Unit-Test, der sicherstellt, dass die Routen-Konstanten die
- * erwarteten String-Werte haben.
+ * Stellt sicher, dass die Routen-Konstanten die erwarteten String-Werte haben.
+ * So merken wir sofort, wenn jemand eine Route umbenennt, ohne die Navigation anzupassen.
  */
 class AppRoutesTest {
 
@@ -24,3 +24,4 @@ class AppRoutesTest {
         assert(AppRoutes.HOME != AppRoutes.SETTINGS)
     }
 }
+

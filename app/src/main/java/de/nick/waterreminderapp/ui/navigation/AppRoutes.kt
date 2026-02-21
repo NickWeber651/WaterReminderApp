@@ -1,4 +1,4 @@
-package de.nick.waterreminderapp.ui
+package de.nick.waterreminderapp.ui.navigation
 
 /** Alle Navigationsrouten der App als typsichere Konstanten. */
 object AppRoutes {
