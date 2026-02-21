@@ -117,7 +117,10 @@ fun HomeScreen(onNavigateToSettings: () -> Unit) {
         ) {
             Text("$totalMl ml / $goalMl ml", style = MaterialTheme.typography.displaySmall)
             LinearProgressIndicator(
-                progress = { (totalMl.toFloat() / goalMl.toFloat()).coerceIn(0f, 1f) },
+                progress = {
+                    if (goalMl > 0) (totalMl.toFloat() / goalMl.toFloat()).coerceIn(0f, 1f)
+                    else 0f
+                },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
