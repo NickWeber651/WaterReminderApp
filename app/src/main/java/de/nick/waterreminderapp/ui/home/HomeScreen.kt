@@ -62,8 +62,11 @@ fun HomeScreen(onNavigateToSettings: () -> Unit) {
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            ReminderScheduler.start(context)
-            scope.launch { snackbar.showSnackbar("Erinnerungen gestartet ✅") }
+            ReminderScheduler.start(context, settings.intervalMinutes.toLong())
+            scope.launch {
+                settingsStore.setRemindersEnabled(true)
+                snackbar.showSnackbar("Erinnerungen gestartet ✅")
+            }
         } else {
             scope.launch { snackbar.showSnackbar("Benachrichtigungen nicht erlaubt ❌") }
         }
@@ -73,8 +76,11 @@ fun HomeScreen(onNavigateToSettings: () -> Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            ReminderScheduler.start(context)
-            scope.launch { snackbar.showSnackbar("Erinnerungen gestartet ✅") }
+            ReminderScheduler.start(context, settings.intervalMinutes.toLong())
+            scope.launch {
+                settingsStore.setRemindersEnabled(true)
+                snackbar.showSnackbar("Erinnerungen gestartet ✅")
+            }
         }
     }
 
@@ -86,10 +92,7 @@ fun HomeScreen(onNavigateToSettings: () -> Unit) {
                 title = { Text("💧 Water Reminder") },
                 actions = {
                     IconButton(onClick = { menuExpanded = true }) {
-                        Icon(
-                            imageVector = Icons.Filled.MoreVert,
-                            contentDescription = "Menü öffnen"
-                        )
+                        Icon(imageVector = Icons.Filled.MoreVert, contentDescription = "Menü öffnen")
                     }
                     DropdownMenu(
                         expanded = menuExpanded,
@@ -97,10 +100,7 @@ fun HomeScreen(onNavigateToSettings: () -> Unit) {
                     ) {
                         DropdownMenuItem(
                             text = { Text("Einstellungen") },
-                            onClick = {
-                                menuExpanded = false
-                                onNavigateToSettings()
-                            }
+                            onClick = { menuExpanded = false; onNavigateToSettings() }
                         )
                     }
                 }
@@ -136,7 +136,10 @@ fun HomeScreen(onNavigateToSettings: () -> Unit) {
             Button(
                 onClick = {
                     ReminderScheduler.stop(context)
-                    scope.launch { snackbar.showSnackbar("Erinnerungen gestoppt ⏹") }
+                    scope.launch {
+                        settingsStore.setRemindersEnabled(false)
+                        snackbar.showSnackbar("Erinnerungen gestoppt ⏹")
+                    }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {

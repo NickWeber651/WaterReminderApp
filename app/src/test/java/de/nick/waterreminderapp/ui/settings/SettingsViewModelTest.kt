@@ -183,5 +183,49 @@ class SettingsViewModelTest {
         assertNull(vm.uiState.value.validationResult.goalMlError)
         assertEquals(0, store.lastSaved.goalMl)
     }
+
+    // ── Scheduler Restart ────────────────────────────────────────────────────
+
+    @Test
+    fun saveMitAktivenReminderStartetSchedulerNeu() = runTest {
+        val store     = FakeSettingsStore(remindersEnabled = true)
+        val scheduler = FakeReminderScheduler()
+        val vm        = SettingsViewModel(store, scheduler)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntervalMinutesChange("45")
+        vm.save()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, scheduler.startCalls.size)
+        assertEquals(45L, scheduler.startCalls.first())
+    }
+
+    @Test
+    fun saveMitInaktivenReminderStartetSchedulerNicht() = runTest {
+        val store     = FakeSettingsStore(remindersEnabled = false)
+        val scheduler = FakeReminderScheduler()
+        val vm        = SettingsViewModel(store, scheduler)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.save()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0, scheduler.startCalls.size)
+    }
+
+    @Test
+    fun saveVerwendetGespeichertesIntervallBeimRestart() = runTest {
+        val store     = FakeSettingsStore(remindersEnabled = true)
+        val scheduler = FakeReminderScheduler()
+        val vm        = SettingsViewModel(store, scheduler)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntervalMinutesChange("120")
+        vm.save()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(120L, scheduler.startCalls.first())
+    }
 }
 

@@ -3,6 +3,7 @@ package de.nick.waterreminderapp.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -23,23 +24,26 @@ data class Settings(
 /** Abstraktionsschicht – ermöglicht Fake-Implementierungen in Unit-Tests. */
 interface ISettingsStore {
     val settingsFlow: Flow<Settings>
+    val remindersEnabledFlow: Flow<Boolean>
     suspend fun updateGoalMl(value: Int)
     suspend fun updateStepMl(value: Int)
     suspend fun updateIntervalMinutes(value: Int)
     suspend fun updateWeekdayStartHour(value: Int)
     suspend fun updateWeekendStartHour(value: Int)
     suspend fun updateEndHour(value: Int)
+    suspend fun setRemindersEnabled(enabled: Boolean)
 }
 
 class SettingsStore(private val context: Context) : ISettingsStore {
 
     private companion object Keys {
-        val GOAL_ML            = intPreferencesKey("goal_ml")
-        val STEP_ML            = intPreferencesKey("step_ml")
-        val INTERVAL_MINUTES   = intPreferencesKey("interval_minutes")
-        val WEEKDAY_START_HOUR = intPreferencesKey("weekday_start_hour")
-        val WEEKEND_START_HOUR = intPreferencesKey("weekend_start_hour")
-        val END_HOUR           = intPreferencesKey("end_hour")
+        val GOAL_ML             = intPreferencesKey("goal_ml")
+        val STEP_ML             = intPreferencesKey("step_ml")
+        val INTERVAL_MINUTES    = intPreferencesKey("interval_minutes")
+        val WEEKDAY_START_HOUR  = intPreferencesKey("weekday_start_hour")
+        val WEEKEND_START_HOUR  = intPreferencesKey("weekend_start_hour")
+        val END_HOUR            = intPreferencesKey("end_hour")
+        val REMINDERS_ENABLED   = booleanPreferencesKey("reminders_enabled")
     }
 
     override val settingsFlow: Flow<Settings> = context.dataStore.data.map { prefs ->
@@ -53,11 +57,16 @@ class SettingsStore(private val context: Context) : ISettingsStore {
         )
     }
 
+    override val remindersEnabledFlow: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[REMINDERS_ENABLED] ?: false }
+
     override suspend fun updateGoalMl(value: Int)           { context.dataStore.edit { it[GOAL_ML]            = value } }
     override suspend fun updateStepMl(value: Int)           { context.dataStore.edit { it[STEP_ML]            = value } }
     override suspend fun updateIntervalMinutes(value: Int)  { context.dataStore.edit { it[INTERVAL_MINUTES]   = value } }
     override suspend fun updateWeekdayStartHour(value: Int) { context.dataStore.edit { it[WEEKDAY_START_HOUR] = value } }
     override suspend fun updateWeekendStartHour(value: Int) { context.dataStore.edit { it[WEEKEND_START_HOUR] = value } }
     override suspend fun updateEndHour(value: Int)          { context.dataStore.edit { it[END_HOUR]           = value } }
+    override suspend fun setRemindersEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[REMINDERS_ENABLED] = enabled }
+    }
 }
-

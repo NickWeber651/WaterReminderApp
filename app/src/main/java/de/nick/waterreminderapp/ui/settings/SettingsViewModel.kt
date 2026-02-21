@@ -5,10 +5,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import de.nick.waterreminderapp.data.ISettingsStore
 import de.nick.waterreminderapp.data.Settings
+import de.nick.waterreminderapp.scheduler.IReminderScheduler
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -34,7 +36,8 @@ sealed interface SettingsEvent {
 // ── ViewModel ────────────────────────────────────────────────────────────────
 
 class SettingsViewModel(
-    private val settingsStore: ISettingsStore
+    private val settingsStore: ISettingsStore,
+    private val scheduler: IReminderScheduler? = null   // null = kein Restart (z.B. im Test ohne Scheduler)
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -106,16 +109,27 @@ class SettingsViewModel(
             settingsStore.updateWeekdayStartHour(weekdayStartHour)
             settingsStore.updateWeekendStartHour(weekendStartHour)
             settingsStore.updateEndHour(endHour)
+
+            // Wenn Reminder aktiv sind: mit neuem Intervall neu starten
+            val remindersActive = settingsStore.remindersEnabledFlow
+                .first()
+            if (remindersActive) {
+                scheduler?.start(intervalMinutes.toLong())
+            }
+
             _events.send(SettingsEvent.SavedSuccess)
         }
     }
 
     // ── Factory ──────────────────────────────────────────────────────────────
 
-    class Factory(private val store: ISettingsStore) : ViewModelProvider.Factory {
+    class Factory(
+        private val store: ISettingsStore,
+        private val scheduler: IReminderScheduler? = null
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            SettingsViewModel(store) as T
+            SettingsViewModel(store, scheduler) as T
     }
 }
 

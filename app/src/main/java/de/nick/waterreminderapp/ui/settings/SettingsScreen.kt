@@ -34,13 +34,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.nick.waterreminderapp.data.SettingsStore
+import de.nick.waterreminderapp.scheduler.ContextReminderScheduler
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     vm: SettingsViewModel = viewModel(
-        factory = SettingsViewModel.Factory(SettingsStore(LocalContext.current))
+        factory = SettingsViewModel.Factory(
+            store     = SettingsStore(LocalContext.current),
+            scheduler = ContextReminderScheduler(LocalContext.current)
+        )
     )
 ) {
     val uiState  by vm.uiState.collectAsState()

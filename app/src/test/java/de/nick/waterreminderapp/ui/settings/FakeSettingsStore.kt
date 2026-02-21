@@ -9,13 +9,22 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * In-Memory Fake – kein Android-Context nötig.
  * Kann im Test mit beliebigen Initialwerten befüllt werden.
  */
-class FakeSettingsStore(initial: Settings = Settings()) : ISettingsStore {
+class FakeSettingsStore(
+    initial: Settings = Settings(),
+    remindersEnabled: Boolean = false
+) : ISettingsStore {
 
     private val _flow = MutableStateFlow(initial)
     override val settingsFlow: Flow<Settings> = _flow
 
+    private val _remindersFlow = MutableStateFlow(remindersEnabled)
+    override val remindersEnabledFlow: Flow<Boolean> = _remindersFlow
+
     // Aufzeichnung der letzten gespeicherten Werte für Assertions
     var lastSaved: Settings = initial
+        private set
+
+    var remindersEnabledValue: Boolean = remindersEnabled
         private set
 
     override suspend fun updateGoalMl(value: Int) {
@@ -42,5 +51,8 @@ class FakeSettingsStore(initial: Settings = Settings()) : ISettingsStore {
         lastSaved = lastSaved.copy(endHour = value)
         _flow.value = lastSaved
     }
+    override suspend fun setRemindersEnabled(enabled: Boolean) {
+        remindersEnabledValue = enabled
+        _remindersFlow.value = enabled
+    }
 }
-
