@@ -32,6 +32,15 @@ interface ISettingsStore {
     suspend fun updateWeekendStartHour(value: Int)
     suspend fun updateEndHour(value: Int)
     suspend fun setRemindersEnabled(enabled: Boolean)
+
+    /** Atomares Update aller editierbaren Settings in einer einzigen DataStore-Transaktion. */
+    suspend fun updateAll(
+        goalMl: Int,
+        intervalMinutes: Int,
+        weekdayStartHour: Int,
+        weekendStartHour: Int,
+        endHour: Int
+    )
 }
 
 class SettingsStore(private val context: Context) : ISettingsStore {
@@ -68,5 +77,21 @@ class SettingsStore(private val context: Context) : ISettingsStore {
     override suspend fun updateEndHour(value: Int)          { context.dataStore.edit { it[END_HOUR]           = value } }
     override suspend fun setRemindersEnabled(enabled: Boolean) {
         context.dataStore.edit { it[REMINDERS_ENABLED] = enabled }
+    }
+
+    override suspend fun updateAll(
+        goalMl: Int,
+        intervalMinutes: Int,
+        weekdayStartHour: Int,
+        weekendStartHour: Int,
+        endHour: Int
+    ) {
+        context.dataStore.edit { prefs ->
+            prefs[GOAL_ML]            = goalMl
+            prefs[INTERVAL_MINUTES]   = intervalMinutes
+            prefs[WEEKDAY_START_HOUR] = weekdayStartHour
+            prefs[WEEKEND_START_HOUR] = weekendStartHour
+            prefs[END_HOUR]           = endHour
+        }
     }
 }

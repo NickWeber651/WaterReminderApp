@@ -55,4 +55,21 @@ class FakeSettingsStore(
         remindersEnabledValue = enabled
         _remindersFlow.value = enabled
     }
+
+    override suspend fun updateAll(
+        goalMl: Int,
+        intervalMinutes: Int,
+        weekdayStartHour: Int,
+        weekendStartHour: Int,
+        endHour: Int
+    ) {
+        lastSaved = lastSaved.copy(
+            goalMl = goalMl,
+            intervalMinutes = intervalMinutes,
+            weekdayStartHour = weekdayStartHour,
+            weekendStartHour = weekendStartHour,
+            endHour = endHour
+        )
+        _flow.value = lastSaved
+    }
 }
