@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import de.nick.waterreminderapp.data.ISettingsStore
-import de.nick.waterreminderapp.data.Settings
 import de.nick.waterreminderapp.scheduler.IReminderScheduler
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,18 +47,18 @@ class SettingsViewModel(
     val events = _events.receiveAsFlow()
 
     init {
-        // Beim Start aktuelle Settings aus DataStore laden und in UI-State übersetzen
+        // Einmalig aktuelle Settings laden – NICHT collect(), da ein dauerhafter
+        // Collector nach jedem save() die User-Eingaben überschreiben würde.
         viewModelScope.launch {
-            settingsStore.settingsFlow.collect { settings ->
-                _uiState.update { it.copy(
-                    goalMlInput           = settings.goalMl.toString(),
-                    intervalMinutesInput  = settings.intervalMinutes.toString(),
-                    weekdayStartHourInput = settings.weekdayStartHour.toString(),
-                    weekendStartHourInput = settings.weekendStartHour.toString(),
-                    endHourInput          = settings.endHour.toString(),
-                    isLoading             = false
-                )}
-            }
+            val settings = settingsStore.settingsFlow.first()
+            _uiState.update { it.copy(
+                goalMlInput           = settings.goalMl.toString(),
+                intervalMinutesInput  = settings.intervalMinutes.toString(),
+                weekdayStartHourInput = settings.weekdayStartHour.toString(),
+                weekendStartHourInput = settings.weekendStartHour.toString(),
+                endHourInput          = settings.endHour.toString(),
+                isLoading             = false
+            )}
         }
     }
 
@@ -102,13 +101,9 @@ class SettingsViewModel(
         _uiState.update { it.copy(validationResult = result) }
         if (!result.isValid) return
 
-        // Schritt 3: In DataStore schreiben
+        // Schritt 3: Atomar in DataStore schreiben (eine Transaktion statt 5 separate)
         viewModelScope.launch {
-            settingsStore.updateGoalMl(goalMl)
-            settingsStore.updateIntervalMinutes(intervalMinutes)
-            settingsStore.updateWeekdayStartHour(weekdayStartHour)
-            settingsStore.updateWeekendStartHour(weekendStartHour)
-            settingsStore.updateEndHour(endHour)
+            settingsStore.updateAll(goalMl, intervalMinutes, weekdayStartHour, weekendStartHour, endHour)
 
             // Wenn Reminder aktiv sind: mit neuem Intervall neu starten
             val remindersActive = settingsStore.remindersEnabledFlow
