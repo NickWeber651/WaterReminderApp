@@ -11,18 +11,28 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,6 +43,7 @@ import de.nick.waterreminderapp.data.SettingsStore
 import de.nick.waterreminderapp.scheduler.ReminderScheduler
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(onNavigateToSettings: () -> Unit) {
     val context       = LocalContext.current
@@ -44,6 +55,8 @@ fun HomeScreen(onNavigateToSettings: () -> Unit) {
     val totalMl  by intakeStore.totalMlTodayFlow.collectAsState(initial = 0)
     val settings by settingsStore.settingsFlow.collectAsState(initial = Settings())
     val goalMl    = settings.goalMl
+
+    var menuExpanded by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -67,7 +80,32 @@ fun HomeScreen(onNavigateToSettings: () -> Unit) {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        snackbarHost = { SnackbarHost(hostState = snackbar) }
+        snackbarHost = { SnackbarHost(hostState = snackbar) },
+        topBar = {
+            TopAppBar(
+                title = { Text("💧 Water Reminder") },
+                actions = {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = "Menü öffnen"
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Einstellungen") },
+                            onClick = {
+                                menuExpanded = false
+                                onNavigateToSettings()
+                            }
+                        )
+                    }
+                }
+            )
+        }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -77,9 +115,6 @@ fun HomeScreen(onNavigateToSettings: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Spacer(Modifier.height(16.dp))
-            Text("💧 Water Reminder", style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.height(8.dp))
             Text("$totalMl ml / $goalMl ml", style = MaterialTheme.typography.displaySmall)
             LinearProgressIndicator(
                 progress = { (totalMl.toFloat() / goalMl.toFloat()).coerceIn(0f, 1f) },
@@ -110,4 +145,3 @@ fun HomeScreen(onNavigateToSettings: () -> Unit) {
         }
     }
 }
-
