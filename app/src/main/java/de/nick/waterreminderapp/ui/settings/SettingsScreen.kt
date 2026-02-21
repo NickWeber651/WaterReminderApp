@@ -91,7 +91,7 @@ fun SettingsScreen(
             OutlinedTextField(
                 value           = uiState.goalMlInput,
                 onValueChange   = vm::onGoalMlChange,
-                label           = { Text("Tagesziel (ml)") },
+                label           = { Text("Tagesziel (ml, min. ${SettingsValidator.GOAL_ML_MIN})") },
                 isError         = v.goalMlError != null,
                 supportingText  = v.goalMlError?.let { { Text(it) } },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

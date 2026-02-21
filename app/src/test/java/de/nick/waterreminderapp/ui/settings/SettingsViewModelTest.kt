@@ -168,10 +168,10 @@ class SettingsViewModelTest {
         assertEquals(Settings().endHour, store.lastSaved.endHour)
     }
 
-    // ── 0 ml ist erlaubt ────────────────────────────────────────────────────
+    // ── goalMl = 0 ist seit 1.0 ungültig ────────────────────────────────────
 
     @Test
-    fun saveNullMlIstGueltigUndWirdGespeichert() = runTest {
+    fun saveNullMlIstUngueltigUndWirdNichtGespeichert() = runTest {
         val store = FakeSettingsStore()
         val vm    = SettingsViewModel(store)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -180,8 +180,9 @@ class SettingsViewModelTest {
         vm.save()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertNull(vm.uiState.value.validationResult.goalMlError)
-        assertEquals(0, store.lastSaved.goalMl)
+        // Fehler erwartet, Store darf nicht überschrieben worden sein
+        assertNotNull(vm.uiState.value.validationResult.goalMlError)
+        assertEquals(Settings().goalMl, store.lastSaved.goalMl)
     }
 
     // ── Scheduler Restart ────────────────────────────────────────────────────
