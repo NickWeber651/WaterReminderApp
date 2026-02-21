@@ -15,7 +15,11 @@ fun AppNavHost() {
         startDestination = AppRoutes.HOME
     ) {
         composable(AppRoutes.HOME) {
-            HomeScreen(onNavigateToSettings = { navController.navigate(AppRoutes.SETTINGS) })
+            HomeScreen(onNavigateToSettings = {
+                navController.navigate(AppRoutes.SETTINGS) {
+                    launchSingleTop = true
+                }
+            })
         }
         composable(AppRoutes.SETTINGS) {
             SettingsScreen(onNavigateBack = { navController.popBackStack() })
