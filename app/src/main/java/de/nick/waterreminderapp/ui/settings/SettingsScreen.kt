@@ -24,32 +24,37 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
+import androidx.lifecycle.viewmodel.compose.viewModel
+import de.nick.waterreminderapp.data.SettingsStore
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onNavigateBack: () -> Unit) {
-    val scope    = rememberCoroutineScope()
+fun SettingsScreen(
+    onNavigateBack: () -> Unit,
+    vm: SettingsViewModel = viewModel(
+        factory = SettingsViewModel.Factory(SettingsStore(LocalContext.current))
+    )
+) {
+    val uiState  by vm.uiState.collectAsState()
     val snackbar = remember { SnackbarHostState() }
+    val v        = uiState.validationResult
 
-    // Formfelder als String – so können wir ungültige Zwischeneingaben anzeigen
-    var goalMlInput           by rememberSaveable { mutableStateOf("2000") }
-    var intervalMinutesInput  by rememberSaveable { mutableStateOf("60") }
-    var weekdayStartHourInput by rememberSaveable { mutableStateOf("8") }
-    var weekendStartHourInput by rememberSaveable { mutableStateOf("9") }
-    var endHourInput          by rememberSaveable { mutableStateOf("23") }
-
-    // Validierungs-Ergebnis wird nur nach "Speichern"-Klick befüllt
-    var validationResult by remember { mutableStateOf(SettingsValidator.ValidationResult()) }
+    // Einmal-Events abhören: Snackbar nur anzeigen wenn wirklich gespeichert
+    LaunchedEffect(Unit) {
+        vm.events.collect { event ->
+            when (event) {
+                SettingsEvent.SavedSuccess -> snackbar.showSnackbar("Gespeichert ✅")
+            }
+        }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbar) },
@@ -80,93 +85,62 @@ fun SettingsScreen(onNavigateBack: () -> Unit) {
             Text("Tagesziel & Intervall", style = MaterialTheme.typography.titleMedium)
 
             OutlinedTextField(
-                value         = goalMlInput,
-                onValueChange = { goalMlInput = it },
-                label         = { Text("Tagesziel (ml)") },
-                isError       = validationResult.goalMlError != null,
-                supportingText = validationResult.goalMlError?.let { { Text(it) } },
+                value           = uiState.goalMlInput,
+                onValueChange   = vm::onGoalMlChange,
+                label           = { Text("Tagesziel (ml)") },
+                isError         = v.goalMlError != null,
+                supportingText  = v.goalMlError?.let { { Text(it) } },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
+                modifier        = Modifier.fillMaxWidth()
             )
 
             OutlinedTextField(
-                value         = intervalMinutesInput,
-                onValueChange = { intervalMinutesInput = it },
-                label         = { Text("Erinnerungsintervall (Minuten)") },
-                isError       = validationResult.intervalMinutesError != null,
-                supportingText = validationResult.intervalMinutesError?.let { { Text(it) } },
+                value           = uiState.intervalMinutesInput,
+                onValueChange   = vm::onIntervalMinutesChange,
+                label           = { Text("Erinnerungsintervall (Minuten)") },
+                isError         = v.intervalMinutesError != null,
+                supportingText  = v.intervalMinutesError?.let { { Text(it) } },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
+                modifier        = Modifier.fillMaxWidth()
             )
 
             Spacer(Modifier.height(4.dp))
             Text("Zeitfenster", style = MaterialTheme.typography.titleMedium)
 
             OutlinedTextField(
-                value         = weekdayStartHourInput,
-                onValueChange = { weekdayStartHourInput = it },
-                label         = { Text("Wochentag Startzeit (Stunde 0–23)") },
-                isError       = validationResult.weekdayStartHourError != null,
-                supportingText = validationResult.weekdayStartHourError?.let { { Text(it) } },
+                value           = uiState.weekdayStartHourInput,
+                onValueChange   = vm::onWeekdayStartHourChange,
+                label           = { Text("Wochentag Startzeit (Stunde 0–23)") },
+                isError         = v.weekdayStartHourError != null,
+                supportingText  = v.weekdayStartHourError?.let { { Text(it) } },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
+                modifier        = Modifier.fillMaxWidth()
             )
 
             OutlinedTextField(
-                value         = weekendStartHourInput,
-                onValueChange = { weekendStartHourInput = it },
-                label         = { Text("Wochenende Startzeit (Stunde 0–23)") },
-                isError       = validationResult.weekendStartHourError != null,
-                supportingText = validationResult.weekendStartHourError?.let { { Text(it) } },
+                value           = uiState.weekendStartHourInput,
+                onValueChange   = vm::onWeekendStartHourChange,
+                label           = { Text("Wochenende Startzeit (Stunde 0–23)") },
+                isError         = v.weekendStartHourError != null,
+                supportingText  = v.weekendStartHourError?.let { { Text(it) } },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
+                modifier        = Modifier.fillMaxWidth()
             )
 
             OutlinedTextField(
-                value         = endHourInput,
-                onValueChange = { endHourInput = it },
-                label         = { Text("Endzeit (Stunde 0–23)") },
-                isError       = validationResult.endHourError != null,
-                supportingText = validationResult.endHourError?.let { { Text(it) } },
+                value           = uiState.endHourInput,
+                onValueChange   = vm::onEndHourChange,
+                label           = { Text("Endzeit (Stunde 0–23)") },
+                isError         = v.endHourError != null,
+                supportingText  = v.endHourError?.let { { Text(it) } },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
+                modifier        = Modifier.fillMaxWidth()
             )
 
             Spacer(Modifier.height(8.dp))
 
             Button(
-                onClick = {
-                    // Erst Parse-Fehler abfangen – nur wenn alle Felder parsebar sind,
-                    // den Validator aufrufen. So bekommt der Nutzer sofort klares Feedback.
-                    val goalMl           = goalMlInput.trim().toIntOrNull()
-                    val intervalMinutes  = intervalMinutesInput.trim().toIntOrNull()
-                    val weekdayStartHour = weekdayStartHourInput.trim().toIntOrNull()
-                    val weekendStartHour = weekendStartHourInput.trim().toIntOrNull()
-                    val endHour          = endHourInput.trim().toIntOrNull()
-
-                    val parseError = SettingsValidator.ValidationResult(
-                        goalMlError           = if (goalMl == null)           "Bitte eine Zahl eingeben" else null,
-                        intervalMinutesError  = if (intervalMinutes == null)  "Bitte eine Zahl eingeben" else null,
-                        weekdayStartHourError = if (weekdayStartHour == null) "Bitte eine Zahl eingeben" else null,
-                        weekendStartHourError = if (weekendStartHour == null) "Bitte eine Zahl eingeben" else null,
-                        endHourError          = if (endHour == null)          "Bitte eine Zahl eingeben" else null,
-                    )
-
-                    if (!parseError.isValid) {
-                        validationResult = parseError
-                        return@Button
-                    }
-
-                    val result = SettingsValidator.validate(
-                        goalMl!!, intervalMinutes!!, weekdayStartHour!!, weekendStartHour!!, endHour!!
-                    )
-                    validationResult = result
-
-                    if (result.isValid) {
-                        scope.launch { snackbar.showSnackbar("Gespeichert ✅") }
-                        // DataStore-Speichern kommt in Commit 4 via SettingsViewModel
-                    }
-                },
+                onClick  = vm::save,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Speichern")

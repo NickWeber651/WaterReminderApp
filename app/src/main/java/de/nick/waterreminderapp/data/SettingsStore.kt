@@ -20,7 +20,18 @@ data class Settings(
     val endHour: Int = 23
 )
 
-class SettingsStore(private val context: Context) {
+/** Abstraktionsschicht – ermöglicht Fake-Implementierungen in Unit-Tests. */
+interface ISettingsStore {
+    val settingsFlow: Flow<Settings>
+    suspend fun updateGoalMl(value: Int)
+    suspend fun updateStepMl(value: Int)
+    suspend fun updateIntervalMinutes(value: Int)
+    suspend fun updateWeekdayStartHour(value: Int)
+    suspend fun updateWeekendStartHour(value: Int)
+    suspend fun updateEndHour(value: Int)
+}
+
+class SettingsStore(private val context: Context) : ISettingsStore {
 
     private companion object Keys {
         val GOAL_ML            = intPreferencesKey("goal_ml")
@@ -31,7 +42,7 @@ class SettingsStore(private val context: Context) {
         val END_HOUR           = intPreferencesKey("end_hour")
     }
 
-    val settingsFlow: Flow<Settings> = context.dataStore.data.map { prefs ->
+    override val settingsFlow: Flow<Settings> = context.dataStore.data.map { prefs ->
         Settings(
             goalMl           = prefs[GOAL_ML]            ?: 2000,
             stepMl           = prefs[STEP_ML]            ?: 250,
@@ -42,11 +53,11 @@ class SettingsStore(private val context: Context) {
         )
     }
 
-    suspend fun updateGoalMl(value: Int)           { context.dataStore.edit { it[GOAL_ML]            = value } }
-    suspend fun updateStepMl(value: Int)           { context.dataStore.edit { it[STEP_ML]            = value } }
-    suspend fun updateIntervalMinutes(value: Int)  { context.dataStore.edit { it[INTERVAL_MINUTES]   = value } }
-    suspend fun updateWeekdayStartHour(value: Int) { context.dataStore.edit { it[WEEKDAY_START_HOUR] = value } }
-    suspend fun updateWeekendStartHour(value: Int) { context.dataStore.edit { it[WEEKEND_START_HOUR] = value } }
-    suspend fun updateEndHour(value: Int)          { context.dataStore.edit { it[END_HOUR]           = value } }
+    override suspend fun updateGoalMl(value: Int)           { context.dataStore.edit { it[GOAL_ML]            = value } }
+    override suspend fun updateStepMl(value: Int)           { context.dataStore.edit { it[STEP_ML]            = value } }
+    override suspend fun updateIntervalMinutes(value: Int)  { context.dataStore.edit { it[INTERVAL_MINUTES]   = value } }
+    override suspend fun updateWeekdayStartHour(value: Int) { context.dataStore.edit { it[WEEKDAY_START_HOUR] = value } }
+    override suspend fun updateWeekendStartHour(value: Int) { context.dataStore.edit { it[WEEKEND_START_HOUR] = value } }
+    override suspend fun updateEndHour(value: Int)          { context.dataStore.edit { it[END_HOUR]           = value } }
 }
 
