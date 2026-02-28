@@ -2,6 +2,7 @@ package de.nick.waterreminderapp.ui.home
 
 import android.Manifest
 import android.os.Build
+import de.nick.waterreminderapp.BuildConfig
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -147,6 +148,15 @@ fun HomeScreen(onNavigateToSettings: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("⏹ Erinnerungen stoppen")
+            }
+
+            if (BuildConfig.DEBUG) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text  = "🛠 DEBUG – Rohwert: $totalMl ml (Ziel: $goalMl ml)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
         }
     }
