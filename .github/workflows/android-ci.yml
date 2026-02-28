@@ -3,7 +3,8 @@
 #
 # Trigger:  push/PR auf main
 # Runner:   Ubuntu (latest)
-# Steps:    JDK 17, Android SDK, Gradle Cache, Unit-Tests, Lint
+# Steps:    JDK 17, Android SDK, Gradle Cache, Unit-Tests, Lint, APK Build
+# Output:   Artifacts: test-reports, app-debug-apk, app-release-apk
 # ============================================================================
 
 name: Android CI
@@ -13,6 +14,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 # Nur ein CI-Lauf pro Branch gleichzeitig (spart Runner-Minuten)
 concurrency:
@@ -62,7 +64,16 @@ jobs:
       - name: Run lint
         run: ./gradlew lintDebug --no-daemon --stacktrace
 
-      # ── 8. Test-Reports hochladen (auch bei Fehler) ──
+      # ── 8. APKs bauen ──
+      # Debug APK ist installierbar (ideal für schnelle Tests)
+      - name: Assemble Debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      # Release APK wird i.d.R. unsigned sein, solange du kein Signing in CI konfigurierst
+      - name: Assemble Release APK
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      # ── 9. Test-Reports hochladen (auch bei Fehler) ──
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -73,3 +84,20 @@ jobs:
             app/build/reports/lint-results-debug.html
           retention-days: 14
 
+      # ── 10. Debug APK als Artifact (installierbar) ──
+      - name: Upload Debug APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+
+      # ── 11. Release APK als Artifact (meist unsigned) ──
+      - name: Upload Release APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: app/build/outputs/apk/release/*.apk
+          retention-days: 14
