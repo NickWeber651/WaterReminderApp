@@ -14,6 +14,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+// ── Konstanten ──────────────────────────────────────────────────────────────
+
+/** Default-Menge im Eingabefeld (Anforderung 5: 250 ml). */
+const val DEFAULT_AMOUNT_ML = "250"
+
 // ── UI-State ────────────────────────────────────────────────────────────────
 
 /**
@@ -29,10 +34,23 @@ data class HomeUiState(
     val goalMl:          Int              = 2000,
     /** Steuert ob das Bottom Sheet zum Hinzufügen geöffnet ist */
     val showAddSheet:    Boolean          = false,
-    /** Aktueller Text im Eingabefeld (Default: 250 als String) */
-    val inputText:       String           = "250",
+    /** Aktueller Text im Eingabefeld */
+    val inputText:       String           = DEFAULT_AMOUNT_ML,
     /** Fehlermeldung bei ungültiger Eingabe – null wenn kein Fehler */
     val inputError:      String?          = null
+)
+
+// ── Interner UI-Control-State (nicht nach außen sichtbar) ────────────────────
+
+/**
+ * Nur die Felder, die lokal im ViewModel verwaltet werden (Sheet, Input).
+ * Entries, totalMl und goalMl kommen aus den Repository-/Settings-Flows
+ * und werden im combine() zusammengeführt.
+ */
+private data class UiControlState(
+    val showAddSheet: Boolean = false,
+    val inputText:    String  = DEFAULT_AMOUNT_ML,
+    val inputError:   String? = null
 )
 
 // ── ViewModel ────────────────────────────────────────────────────────────────
@@ -42,10 +60,7 @@ class HomeViewModel(
     private val settingsStore: ISettingsStore
 ) : ViewModel() {
 
-    // Interner State für UI-Controls (Sheet, Input, Fehler)
-    private val _uiControl = MutableStateFlow(
-        HomeUiState()  // nur die UI-Control-Felder sind hier relevant
-    )
+    private val _uiControl = MutableStateFlow(UiControlState())
 
     /**
      * Kombiniert den Repository-Flow (Einträge + Summe) mit den Settings (Ziel)
@@ -53,6 +68,11 @@ class HomeViewModel(
      *
      * Warum combine statt separater StateFlows?
      * So hat die UI immer einen konsistenten Snapshot ohne Race Conditions.
+     *
+     * Warum SharingStarted.Eagerly?
+     * WhileSubscribed(5_000) führte in Tests zu flaky-Verhalten, weil der
+     * Flow nach dem letzten Collector erst nach 5 s kalt wird. Eagerly ist
+     * für ein immer-sichtbares Home-ViewModel ein akzeptabler Trade-off.
      */
     val uiState: StateFlow<HomeUiState> = combine(
         combine(repository.todayEntriesFlow, repository.totalMlTodayFlow) { entries, total ->
@@ -80,7 +100,7 @@ class HomeViewModel(
 
     /** Plus-Button geklickt → Sheet öffnen und Input auf Default zurücksetzen */
     fun openAddSheet() {
-        _uiControl.update { it.copy(showAddSheet = true, inputText = "250", inputError = null) }
+        _uiControl.update { UiControlState(showAddSheet = true) }
     }
 
     /** Sheet schließen (Abbrechen oder nach erfolgreichem Speichern) */
@@ -95,7 +115,7 @@ class HomeViewModel(
 
     /**
      * Nutzer bestätigt die Eingabe.
-     * Bei gültigem Wert: Eintrag speichern + Sheet schließen.
+     * Bei gültigem Wert: Eintrag speichern → Sheet schließen.
      * Bei ungültigem Wert: Fehler setzen, Sheet bleibt offen.
      */
     fun confirmAdd() {
@@ -108,8 +128,9 @@ class HomeViewModel(
         val amountMl = AddEntryValidator.parse(input)
         viewModelScope.launch {
             repository.addEntry(amountMl)
+            // Sheet erst nach erfolgreichem Speichern schließen
+            _uiControl.update { it.copy(showAddSheet = false, inputError = null) }
         }
-        closeAddSheet()
     }
 
     // ── Löschen ───────────────────────────────────────────────────────────
@@ -135,4 +156,3 @@ class HomeViewModel(
             HomeViewModel(repository, settingsStore) as T
     }
 }
-

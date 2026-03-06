@@ -134,6 +134,19 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `confirmAdd mit Default-Input 250 funktioniert ohne onInputChange`() = runTest {
+        vm.openAddSheet()
+        // Kein onInputChange → Default DEFAULT_AMOUNT_ML = "250"
+        vm.confirmAdd()
+        advanceUntilIdle()
+
+        val state = vm.uiState.first()
+        assertFalse(state.showAddSheet)
+        assertEquals(1, state.entries.size)
+        assertEquals(250, state.entries[0].amountMl)
+    }
+
+    @Test
     fun `mehrere confirmAdd-Aufrufe akkumulieren totalMl`() = runTest {
         vm.openAddSheet(); vm.onInputChange("250"); vm.confirmAdd()
         advanceUntilIdle()
@@ -159,6 +172,19 @@ class HomeViewModelTest {
         val state = vm.uiState.first()
         assertTrue(state.entries.isEmpty())
         assertEquals(0, state.totalMl)
+    }
+
+    @Test
+    fun `deleteEntry mit unbekannter ID ist no-op`() = runTest {
+        vm.openAddSheet(); vm.onInputChange("250"); vm.confirmAdd()
+        advanceUntilIdle()
+
+        vm.deleteEntry("nicht-vorhanden")
+        advanceUntilIdle()
+
+        val state = vm.uiState.first()
+        assertEquals(1, state.entries.size)
+        assertEquals(250, state.totalMl)
     }
 
     // ── goalMl aus Settings ──────────────────────────────────────────────

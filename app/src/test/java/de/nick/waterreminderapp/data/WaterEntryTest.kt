@@ -23,13 +23,17 @@ class WaterEntryTest {
     }
 
     @Test
-    fun `create erzeugt eindeutige IDs`() {
-        // Zwei Einträge nacheinander sollen unterschiedliche IDs haben.
-        // Wir fügen 1 ms Pause ein, da die ID auf System.currentTimeMillis basiert.
+    fun `create erzeugt eindeutige IDs auch ohne Pause`() {
+        // UUID-basierte IDs dürfen nie kollidieren – auch bei sofortigem Aufruf.
         val a = WaterEntry.create(250)
-        Thread.sleep(2)
         val b = WaterEntry.create(250)
         assertNotEquals("Zwei Einträge sollen unterschiedliche IDs haben", a.id, b.id)
+    }
+
+    @Test
+    fun `create erzeugt 100 eindeutige IDs in Schleife`() {
+        val ids = (1..100).map { WaterEntry.create(250).id }.toSet()
+        assertEquals("Alle 100 IDs müssen eindeutig sein", 100, ids.size)
     }
 
     @Test

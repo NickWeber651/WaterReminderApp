@@ -1,9 +1,5 @@
 package de.nick.waterreminderapp.ui.home
 
-import android.Manifest
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,7 +40,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,8 +51,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.nick.waterreminderapp.data.DataStoreIntakeRepository
 import de.nick.waterreminderapp.data.SettingsStore
-import de.nick.waterreminderapp.scheduler.ReminderScheduler
-import kotlinx.coroutines.launch
 
 private const val MAX_VISIBLE_ENTRIES = 3
 
@@ -67,51 +60,20 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToHistory: () -> Unit
 ) {
-    val context = LocalContext.current
-    val scope   = rememberCoroutineScope()
+    val context  = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
 
-    // ── ViewModel ────────────────────────────────────────────────────────
-    val vm: HomeViewModel = viewModel(
-        factory = HomeViewModel.Factory(
+    // ── ViewModel (Factory mit remember, damit bei Recomposition keine neuen Instanzen entstehen)
+    val factory = remember {
+        HomeViewModel.Factory(
             repository    = DataStoreIntakeRepository.create(context),
             settingsStore = SettingsStore(context)
         )
-    )
+    }
+    val vm: HomeViewModel = viewModel(factory = factory)
     val state by vm.uiState.collectAsState()
 
-    // ── Reminder-Permission (bleibt im Screen, nicht im ViewModel) ───────
-    val settingsStore = remember { SettingsStore(context) }
-    val settings by settingsStore.settingsFlow.collectAsState(
-        initial = de.nick.waterreminderapp.data.Settings()
-    )
     var menuExpanded by remember { mutableStateOf(false) }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            ReminderScheduler.start(context, settings.intervalMinutes.toLong())
-            scope.launch {
-                settingsStore.setRemindersEnabled(true)
-                snackbar.showSnackbar("Erinnerungen gestartet ✅")
-            }
-        } else {
-            scope.launch { snackbar.showSnackbar("Benachrichtigungen nicht erlaubt ❌") }
-        }
-    }
-
-    fun requestPermissionAndStart() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            ReminderScheduler.start(context, settings.intervalMinutes.toLong())
-            scope.launch {
-                settingsStore.setRemindersEnabled(true)
-                snackbar.showSnackbar("Erinnerungen gestartet ✅")
-            }
-        }
-    }
 
     // ── Bottom Sheet State ────────────────────────────────────────────────
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)

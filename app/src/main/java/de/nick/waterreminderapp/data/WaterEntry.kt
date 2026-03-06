@@ -1,5 +1,7 @@
 package de.nick.waterreminderapp.data
 
+import java.util.UUID
+
 /**
  * Repräsentiert einen einzelnen Trinkvorgang des aktuellen Tages.
  *
@@ -21,12 +23,12 @@ data class WaterEntry(
     companion object {
         /**
          * Erzeugt einen neuen Eintrag mit einer eindeutigen ID.
-         * Wir verwenden einen einfachen Timestamp-basierten String als ID –
-         * ausreichend für eine single-user offline App.
+         * UUID statt Timestamp, damit auch bei schnellen Aufrufen
+         * (z.B. repeat(3) { addEntry(250) }) keine ID-Kollision entsteht.
          */
         fun create(amountMl: Int): WaterEntry =
             WaterEntry(
-                id       = System.currentTimeMillis().toString(),
+                id       = UUID.randomUUID().toString(),
                 amountMl = amountMl
             )
     }

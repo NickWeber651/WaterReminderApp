@@ -60,6 +60,13 @@ class AddEntryValidatorTest {
     }
 
     @Test
+    fun `Int Overflow liefert Fehlermeldung`() {
+        // Int.MAX_VALUE + 1 als String → toIntOrNull() gibt null zurück
+        val overflow = (Int.MAX_VALUE.toLong() + 1).toString()
+        assertEquals(AddEntryValidator.ERROR_MESSAGE, AddEntryValidator.validate(overflow))
+    }
+
+    @Test
     fun `parse gibt korrekten Int-Wert zurueck`() {
         assertEquals(250, AddEntryValidator.parse("250"))
         assertEquals(500, AddEntryValidator.parse("500"))
