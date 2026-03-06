@@ -180,18 +180,9 @@ private fun HydrationRing(
         label         = "ringProgress"
     )
 
-    // ── Kontinuierliche Animationen (wie die Wellen im Tropfen) ───────────
+    // ── Kontinuierliche Animationen ───────────────────────────────────────
     val infiniteTransition = rememberInfiniteTransition(label = "ringInfinite")
 
-    // Shimmer-Licht läuft einmal pro 2,4 s den Bogen entlang (0→1)
-    val shimmerPos by infiniteTransition.animateFloat(
-        initialValue  = 0f,
-        targetValue   = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2400, easing = LinearEasing)
-        ),
-        label = "shimmerPos"
-    )
 
     // Dot-Puls: sanftes Atmen des leuchtenden Endpunkts
     val dotPulse by infiniteTransition.animateFloat(
@@ -260,27 +251,6 @@ private fun HydrationRing(
                 style      = Stroke(width = strokePx, cap = StrokeCap.Round)
             )
 
-            // ---- Shimmer-Licht: heller Fleck läuft den Bogen entlang ----
-            // Nur sichtbar wenn genug Bogen vorhanden (> 5 %)
-            if (animatedProgress > 0.05f) {
-                val shimmerAngle = GAUGE_START_ANGLE + sweepAngle * shimmerPos
-                val shimmerRad   = Math.toRadians(shimmerAngle.toDouble()).toFloat()
-                val shimmerX     = cx + r * cos(shimmerRad)
-                val shimmerY     = cy + r * sin(shimmerRad)
-
-                // Äußerer weicher Halo
-                drawCircle(
-                    color  = Color.White.copy(alpha = 0.18f),
-                    radius = strokePx * 1.1f,
-                    center = Offset(shimmerX, shimmerY)
-                )
-                // Heller Kern
-                drawCircle(
-                    color  = Color.White.copy(alpha = 0.55f),
-                    radius = strokePx * 0.4f,
-                    center = Offset(shimmerX, shimmerY)
-                )
-            }
 
             // ---- Leuchtender Dot am Fortschritts-Ende (pulsierend) ----
             val endAngleRad = Math.toRadians(
