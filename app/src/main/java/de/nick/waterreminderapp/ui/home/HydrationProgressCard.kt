@@ -321,7 +321,13 @@ internal fun WaterDrop(
             // Dunkler Tropfen-Hintergrund
             drawPath(path = dropPath, color = DropBackground)
 
-            val waterTopY = h * (1f - animatedFill)
+            // Welle-Amplitude (muss mit buildWavePath-Aufrufen übereinstimmen)
+            val maxAmplitude = h * 0.028f
+            // waterTopY um eine Amplitude nach oben verschieben, damit bei
+            // hohem Füllstand die Welle den Tropfen vollständig ausfüllt.
+            // Bei 0 % kein Offset, damit kein Wasser-Streifen sichtbar ist.
+            val amplitudeOffset = if (animatedFill > 0f) maxAmplitude else 0f
+            val waterTopY = h * (1f - animatedFill) - amplitudeOffset
 
             // Welle 1 – helle Vorderwelle
             drawPath(
