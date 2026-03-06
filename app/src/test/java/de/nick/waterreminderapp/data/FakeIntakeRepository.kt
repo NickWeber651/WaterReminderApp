@@ -28,9 +28,20 @@ class FakeIntakeRepository : IntakeRepository {
         _entries.update { list -> list.filter { it.id != id } }
     }
 
+    // ── Congrats ─────────────────────────────────────────────────────────
+
+    private var _congratsSent = false
+
+    override suspend fun isCongratsSentToday(): Boolean = _congratsSent
+
+    override suspend fun markCongratsSent() { _congratsSent = true }
+
     /** Hilfsfunktion für Tests: aktuellen State direkt setzen. */
     fun setEntries(entries: List<WaterEntry>) {
         _entries.value = entries
     }
+
+    /** Hilfsfunktion für Tests: congratsSent zurücksetzen. */
+    fun resetCongrats() { _congratsSent = false }
 }
 

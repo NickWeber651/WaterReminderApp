@@ -6,7 +6,6 @@ import androidx.work.Configuration
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
 import de.nick.waterreminderapp.data.DataStoreIntakeRepository
-import de.nick.waterreminderapp.data.IntakeStore
 import de.nick.waterreminderapp.util.FakeTimeProvider
 import de.nick.waterreminderapp.worker.WaterWorkerFactory
 import kotlinx.coroutines.flow.first
@@ -70,19 +69,17 @@ class WaterActionReceiverTest {
     }
 
     @Test fun `DRANK bei Zielerreichen setzt congratsSent`() {
-        val repo  = DataStoreIntakeRepository.create(context)
-        val store = IntakeStore(context)  // congratsSent bleibt im alten Store
+        val repo = DataStoreIntakeRepository.create(context)
         runBlocking { repeat(7) { repo.addEntry(250) } }
         sendDrank()
-        assertTrue(runBlocking { store.isCongratsSentToday() })
+        assertTrue(runBlocking { repo.isCongratsSentToday() })
     }
 
     @Test fun `DRANK nach congratsSent aendert Status nicht`() {
-        val repo  = DataStoreIntakeRepository.create(context)
-        val store = IntakeStore(context)
-        runBlocking { repeat(8) { repo.addEntry(250) }; store.markCongratsSent() }
+        val repo = DataStoreIntakeRepository.create(context)
+        runBlocking { repeat(8) { repo.addEntry(250) }; repo.markCongratsSent() }
         sendDrank()
-        assertTrue(runBlocking { store.isCongratsSentToday() })
+        assertTrue(runBlocking { repo.isCongratsSentToday() })
     }
 
     @Test fun `SNOOZE erstellt UniqueWork mit korrektem Namen`() {

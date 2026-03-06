@@ -7,9 +7,11 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import de.nick.waterreminderapp.util.SystemTimeProvider
 import de.nick.waterreminderapp.util.TimeProvider
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 // DataStore-Singleton für den produktiven Einsatz (Context-Delegate)
@@ -47,9 +49,12 @@ class DataStoreIntakeRepository(
      * (Kotlin erlaubt nur ein companion object pro Klasse.)
      */
     companion object {
-        private val ENTRIES_CSV = stringPreferencesKey("entries_csv")
-        private val SAVED_DAY   = intPreferencesKey("entries_day")
-        private val SAVED_YEAR  = intPreferencesKey("entries_year")
+        private val ENTRIES_CSV   = stringPreferencesKey("entries_csv")
+        private val SAVED_DAY     = intPreferencesKey("entries_day")
+        private val SAVED_YEAR    = intPreferencesKey("entries_year")
+        private val CONGRATS_SENT = booleanPreferencesKey("congrats_sent")
+        private val CONGRATS_DAY  = intPreferencesKey("congrats_day")
+        private val CONGRATS_YEAR = intPreferencesKey("congrats_year")
 
         fun create(
             context: Context,
@@ -130,6 +135,23 @@ class DataStoreIntakeRepository(
 
             val current = (prefs[ENTRIES_CSV] ?: "").toEntries()
             prefs[ENTRIES_CSV] = current.filter { it.id != id }.toCsv()
+        }
+    }
+
+    // ── Congrats-Logik ──────────────────────────────────────────────────────
+
+    override suspend fun isCongratsSentToday(): Boolean {
+        val prefs = dataStore.data.first()
+        val savedDay  = prefs[CONGRATS_DAY]  ?: 0
+        val savedYear = prefs[CONGRATS_YEAR] ?: 0
+        return if (!isSameDay(savedDay, savedYear)) false else prefs[CONGRATS_SENT] ?: false
+    }
+
+    override suspend fun markCongratsSent() {
+        dataStore.edit { prefs ->
+            prefs[CONGRATS_SENT] = true
+            prefs[CONGRATS_DAY]  = todayDay()
+            prefs[CONGRATS_YEAR] = todayYear()
         }
     }
 }

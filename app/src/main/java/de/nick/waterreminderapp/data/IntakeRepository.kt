@@ -39,5 +39,19 @@ interface IntakeRepository {
      * Wird aus [todayEntriesFlow] abgeleitet – kein separater Datenbankwert.
      */
     val totalMlTodayFlow: Flow<Int>
+
+    // ── Congrats-Logik (Tagesziel-Glückwunsch) ───────────────────────────
+
+    /**
+     * Ob heute bereits eine Glückwunsch-Notification angezeigt wurde.
+     * Wird beim Tageswechsel automatisch auf false zurückgesetzt.
+     */
+    suspend fun isCongratsSentToday(): Boolean
+
+    /**
+     * Markiert, dass heute die Glückwunsch-Notification angezeigt wurde.
+     * So wird sie nicht erneut gesendet, wenn der Worker erneut läuft.
+     */
+    suspend fun markCongratsSent()
 }
 

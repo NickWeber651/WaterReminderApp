@@ -188,4 +188,26 @@ class DataStoreIntakeRepositoryTest {
         writeRawCsv("id1:0")
         assertTrue(repo.todayEntriesFlow.first().isEmpty())
     }
+
+    // ── Congrats ────────────────────────────────────────────────────────────
+
+    @Test
+    fun `isCongratsSentToday liefert initial false`() = runBlocking {
+        assertEquals(false, repo.isCongratsSentToday())
+    }
+
+    @Test
+    fun `markCongratsSent setzt Flag auf true`() = runBlocking {
+        repo.markCongratsSent()
+        assertEquals(true, repo.isCongratsSentToday())
+    }
+
+    @Test
+    fun `nach Tageswechsel wird congratsSent zurueckgesetzt`() = runBlocking {
+        repo.markCongratsSent()
+        assertTrue(repo.isCongratsSentToday())
+
+        fakeTime.advanceToDayOfYear(dayCounter + 50, YEAR)
+        assertEquals(false, repo.isCongratsSentToday())
+    }
 }
