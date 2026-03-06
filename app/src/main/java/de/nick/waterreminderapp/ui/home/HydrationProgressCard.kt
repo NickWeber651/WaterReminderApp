@@ -393,14 +393,14 @@ internal fun WaterDrop(
         // Glanz-Highlight oben-links im runden Teil des Tropfens
         drawCircle(
             color  = Color.White.copy(alpha = 0.18f),
-            radius = w * 0.070f,
-            center = Offset(w * 0.36f, h * 0.14f)
+            radius = w * 0.055f,
+            center = Offset(w * 0.40f, h * 0.13f)
         )
         // Zweiter, kleinerer Glanzpunkt – subtiler Glasreflex
         drawCircle(
             color  = Color.White.copy(alpha = 0.09f),
-            radius = w * 0.038f,
-            center = Offset(w * 0.30f, h * 0.23f)
+            radius = w * 0.030f,
+            center = Offset(w * 0.36f, h * 0.21f)
         )
     }
 }
@@ -486,53 +486,50 @@ private fun DrawScope.drawBubbles(
 private fun buildDropPath(w: Float, h: Float): Path = Path().apply {
     val cx = w / 2f
 
-    // Der obere Halbkreis: Mittelpunkt und Radius
-    // Der Kreis nimmt die oberen ~55 % der Höhe ein.
-    val circleRadius  = w * 0.46f      // knapp unter Halbbreite → kompakter Kreis
-    val circleCenterY = h * 0.38f      // Kreismitte sitzt im oberen Bereich
+    // Schlanker Tropfen: Kreis ist deutlich schmaler als das Canvas
+    // Breite des Kreises ≈ 64 % der Canvas-Breite (war vorher fast 92 %)
+    val circleRadius  = w * 0.32f      // schlanker Kreis – echter Tropfen-Look
+    val circleCenterY = h * 0.35f      // Kreismitte etwas höher → mehr Platz für Spitze
 
-    // Die Spitze sitzt ganz unten
+    // Spitze ganz unten
     val tipY = h * 0.965f
 
-    // Schultern: links und rechts auf Höhe des Kreismittelpunkts
+    // Schultern: links/rechts auf Höhe des Kreismittelpunkts
     val shoulderX = circleRadius
     val shoulderY = circleCenterY
 
-    // Bézier-Kontrollpunkte für die Flanken (Schulter → Spitze):
-    // cp1 hält die Breite noch aufrecht (bauchige Mitte), cp2 zieht zur Mitte ein
-    val cp1X = w * 0.47f
-    val cp1Y = h * 0.66f
-    val cp2X = w * 0.18f
-    val cp2Y = h * 0.89f
+    // Flanken-Kontrollpunkte (Schulter → Spitze):
+    // cp1 leicht breiter als Schulter → sanfter Bauch, aber schmal
+    // cp2 zieht eng zur Mitte → klarer Einzug zur Spitze
+    val cp1X = w * 0.33f
+    val cp1Y = h * 0.63f
+    val cp2X = w * 0.12f
+    val cp2Y = h * 0.88f
 
-    // Linke Schulter als Startpunkt
     moveTo(cx - shoulderX, shoulderY)
 
-    // Linke Flanke → Spitze (unten)
+    // Linke Flanke → Spitze
     cubicTo(
         cx - cp1X, cp1Y,
         cx - cp2X, cp2Y,
         cx,        tipY
     )
 
-    // Rechte Flanke ← Spitze (nach oben)
+    // Rechte Flanke ← Spitze
     cubicTo(
         cx + cp2X, cp2Y,
         cx + cp1X, cp1Y,
         cx + shoulderX, shoulderY
     )
 
-    // Oberen Halbkreis in 2 kubischen Segmenten approximieren
-    // Bézier-Kreis-Approximation: k ≈ 0.5523 * Radius
+    // Oberer Halbkreis – 2-Segment-Bézier-Approximation (k ≈ 0.5523 * r)
     val k = circleRadius * 0.5523f
 
-    // Rechte Schulter → Scheitelpunkt (oben Mitte)
     cubicTo(
         cx + circleRadius, circleCenterY - k,
         cx + k,            circleCenterY - circleRadius,
         cx,                circleCenterY - circleRadius
     )
-    // Scheitelpunkt → Linke Schulter
     cubicTo(
         cx - k,            circleCenterY - circleRadius,
         cx - circleRadius, circleCenterY - k,
