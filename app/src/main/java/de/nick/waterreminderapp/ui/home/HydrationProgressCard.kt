@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.text.font.FontWeight
@@ -39,21 +40,37 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.sin
 
 // ---------------------------------------------------------------------------
-// Farben
+// Design-Konstanten
 // ---------------------------------------------------------------------------
 
-private val CardBackground    = Color(0xFF1A2332)
-private val RingTrackColor    = Color(0xFF263445)
-private val RingProgressStart = Color(0xFF00C2FF)
-private val RingProgressEnd   = Color(0xFF0077B6)
+private val CardBackground    = Color(0xFF151F2E)   // leicht dunkler als vorher
+private val RingTrackColor    = Color(0xFF1E2E40)
+private val RingProgressStart = Color(0xFF00D4FF)   // kräftigeres Aqua
+private val RingProgressEnd   = Color(0xFF0088CC)
+private val RingGlow          = Color(0xFF00AADD)   // für den Innen-Glüheffekt
+private val DropBackground    = Color(0xFF162233)
 private val DropOutline       = Color(0xFF00B4D8)
-private val WaterTop          = Color(0xFF48CAE4)
+private val WaterTop          = Color(0xFF4DD8EE)
 private val WaterBottom       = Color(0xFF0096C7)
-private val TextPrimary       = Color(0xFFE8F4FD)
-private val TextSecondary     = Color(0xFF90B4CE)
+private val TextPrimary       = Color(0xFFEAF6FF)
+private val TextSecondary     = Color(0xFF7AAFC8)
+private val TextLabel         = Color(0xFF4A7A96)   // dezentes Label "Heute"
+
+// Gauge-Bogen: 240° breiter Halbkreis-Gauge (startet links-unten, endet rechts-unten)
+private const val GAUGE_START_ANGLE = 150f
+private const val GAUGE_SWEEP       = 240f
+
+private val RING_STROKE         = 20.dp
+private val RING_GLOW_STROKE    = 36.dp   // weicher Halo dahinter
+private val DROP_SIZE           = 112.dp
+private val RING_SIZE           = 280.dp
+private val CARD_CORNER         = 32.dp
+private val CARD_PADDING_V      = 36.dp
+private val CARD_PADDING_H      = 28.dp
 
 // ---------------------------------------------------------------------------
 // Fortschrittslogik (rein, testbar)
@@ -64,7 +81,7 @@ private val TextSecondary     = Color(0xFF90B4CE)
  *
  * Edge Cases:
  * - goalMl <= 0  → 0f (kein Ziel definiert)
- * - totalMl < 0  → 0f (negativer Wert unmöglich)
+ * - totalMl <= 0 → 0f (negativer Wert unmöglich)
  * - totalMl > goalMl → 1f (Ziel erreicht / überschritten)
  */
 internal fun calculateProgress(totalMl: Int, goalMl: Int): Float {
@@ -77,8 +94,8 @@ internal fun calculateProgress(totalMl: Int, goalMl: Int): Float {
 // ---------------------------------------------------------------------------
 
 /**
- * Zeigt den Hydrations-Fortschritt als dunkle Card mit halbkreisförmigem Gauge-Ring
- * und einem gefüllten Wassertropfen.
+ * Zeigt den Hydrations-Fortschritt als dunkle Card mit breitem Gauge-Ring (240°)
+ * und animiertem Wassertropfen.
  *
  * @param totalMl  Bereits getrunkene Menge in ml
  * @param goalMl   Tagesziel in ml
@@ -93,33 +110,32 @@ fun HydrationProgressCard(
     val progress = calculateProgress(totalMl, goalMl)
 
     Surface(
-        modifier      = modifier.fillMaxWidth(),
-        shape         = RoundedCornerShape(28.dp),
-        color         = CardBackground,
-        tonalElevation = 0.dp,
-        shadowElevation = 8.dp
+        modifier        = modifier.fillMaxWidth(),
+        shape           = RoundedCornerShape(CARD_CORNER),
+        color           = CardBackground,
+        tonalElevation  = 0.dp,
+        shadowElevation = 12.dp
     ) {
         Column(
-            modifier            = Modifier.padding(vertical = 32.dp, horizontal = 24.dp),
+            modifier            = Modifier.padding(vertical = CARD_PADDING_V, horizontal = CARD_PADDING_H),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            // Gauge + Tropfen übereinander im selben Box-Stack
             HydrationGauge(
                 progress = progress,
-                ringSize = 260.dp,
-                dropSize = 100.dp
+                ringSize = RING_SIZE,
+                dropSize = DROP_SIZE
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(20.dp))
 
-            ProgressValueText(totalMl = totalMl, goalMl = goalMl)
+            ProgressValueText(totalMl = totalMl, goalMl = goalMl, progress = progress)
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Gauge: halbkreisförmiger Ring + Tropfen zentriert
+// Gauge: Ring + Tropfen übereinander
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -128,27 +144,27 @@ private fun HydrationGauge(
     ringSize: Dp,
     dropSize: Dp
 ) {
+    // Höhe: bei 240°-Bogen (150° → 390°) reicht der Bogen von oben links nach oben rechts
+    // und geht unten durch → Scheitelpunkt oben. 75 % Höhe ist gut für diesen Bogen.
     Box(
         contentAlignment = Alignment.Center,
-        modifier         = Modifier.size(ringSize, ringSize * 0.65f) // Gauge ist ein Halbbogen
+        modifier         = Modifier.size(ringSize, ringSize * 0.75f)
     ) {
         HydrationRing(
             progress = progress,
             modifier = Modifier.size(ringSize)
         )
-
-        // Tropfen leicht nach unten verschoben, damit er mittig im Bogen sitzt
         WaterDrop(
             fillFraction = progress,
             modifier     = Modifier
                 .size(dropSize)
-                .align(Alignment.BottomCenter)
+                .align(Alignment.Center)
         )
     }
 }
 
 // ---------------------------------------------------------------------------
-// Halbkreisförmiger Fortschrittsring (Gauge)
+// Halbkreisförmiger Fortschrittsring (Gauge, 240°)
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -156,59 +172,104 @@ private fun HydrationRing(
     progress: Float,
     modifier: Modifier = Modifier
 ) {
-    // Weiche Animation: beim ersten Einblenden und bei Wertänderungen
     val animatedProgress by animateFloatAsState(
-        targetValue  = progress,
-        animationSpec = tween(
-            durationMillis = 800,
-            easing         = FastOutSlowInEasing
-        ),
-        label = "ringProgress"
+        targetValue   = progress,
+        animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+        label         = "ringProgress"
     )
 
     Canvas(modifier = modifier) {
-        val strokeWidth = 18.dp.toPx()
-        val inset       = strokeWidth / 2f
-        val arcRect     = Rect(
+        val strokePx     = RING_STROKE.toPx()
+        val glowPx       = RING_GLOW_STROKE.toPx()
+        val inset        = glowPx / 2f   // Inset nach dem größten Stroke richten
+        val arcRect      = Rect(
             offset = Offset(inset, inset),
-            size   = Size(size.width - strokeWidth, size.height - strokeWidth)
+            size   = Size(size.width - glowPx, size.height - glowPx)
         )
 
-        // Bogen-Parameter: startet bei 210°, geht 120° (links-unten → rechts-unten, als Halbkreis-Gauge)
-        val startAngle  = 210f
-        val sweepTotal  = 120f
-
-        // Track (Hintergrundring)
+        // ---- Halo / Glüh-Track (sehr soft, transparent) ----
         drawArc(
-            color      = RingTrackColor,
-            startAngle = startAngle,
-            sweepAngle = sweepTotal,
+            brush      = Brush.sweepGradient(
+                0.0f to RingGlow.copy(alpha = 0.0f),
+                0.5f to RingGlow.copy(alpha = 0.06f),
+                1.0f to RingGlow.copy(alpha = 0.0f)
+            ),
+            startAngle = GAUGE_START_ANGLE,
+            sweepAngle = GAUGE_SWEEP,
             useCenter  = false,
             topLeft    = arcRect.topLeft,
             size       = arcRect.size,
-            style      = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            style      = Stroke(width = glowPx, cap = StrokeCap.Round)
         )
 
-        // Fortschritts-Bogen
+        // ---- Track (Hintergrundring) ----
+        drawArc(
+            color      = RingTrackColor,
+            startAngle = GAUGE_START_ANGLE,
+            sweepAngle = GAUGE_SWEEP,
+            useCenter  = false,
+            topLeft    = arcRect.topLeft,
+            size       = arcRect.size,
+            style      = Stroke(width = strokePx, cap = StrokeCap.Round)
+        )
+
+        // ---- Fortschritts-Bogen mit Gradient ----
         if (animatedProgress > 0f) {
             drawArc(
                 brush      = Brush.sweepGradient(
-                    0.0f to RingProgressStart,
-                    1.0f to RingProgressEnd
+                    0.0f  to RingProgressStart,
+                    0.65f to RingProgressEnd,
+                    1.0f  to RingProgressEnd
                 ),
-                startAngle = startAngle,
-                sweepAngle = sweepTotal * animatedProgress,
+                startAngle = GAUGE_START_ANGLE,
+                sweepAngle = GAUGE_SWEEP * animatedProgress,
                 useCenter  = false,
                 topLeft    = arcRect.topLeft,
                 size       = arcRect.size,
-                style      = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                style      = Stroke(width = strokePx, cap = StrokeCap.Round)
+            )
+
+            // ---- Leuchtender Dot am Fortschritts-Ende ----
+            val endAngleRad = Math.toRadians(
+                (GAUGE_START_ANGLE + GAUGE_SWEEP * animatedProgress).toDouble()
+            ).toFloat()
+            val cx    = size.width  / 2f
+            val cy    = size.height / 2f
+            val r     = arcRect.width / 2f
+            val dotX  = cx + r * cos(endAngleRad)
+            val dotY  = cy + r * sin(endAngleRad)
+
+            // Äußeres Leuchten
+            drawCircle(
+                color  = RingProgressStart.copy(alpha = 0.35f),
+                radius = strokePx * 0.9f,
+                center = Offset(dotX, dotY)
+            )
+            // Innerer heller Kern
+            drawCircle(
+                color  = Color.White.copy(alpha = 0.85f),
+                radius = strokePx * 0.28f,
+                center = Offset(dotX, dotY)
             )
         }
+
+        // ---- Dot am Start-Ende (immer sichtbar als Anker) ----
+        val startAngleRad = Math.toRadians(GAUGE_START_ANGLE.toDouble()).toFloat()
+        val cx   = size.width  / 2f
+        val cy   = size.height / 2f
+        val r    = arcRect.width / 2f
+        val sx   = cx + r * cos(startAngleRad)
+        val sy   = cy + r * sin(startAngleRad)
+        drawCircle(
+            color  = RingTrackColor,
+            radius = strokePx * 0.38f,
+            center = Offset(sx, sy)
+        )
     }
 }
 
 // ---------------------------------------------------------------------------
-// Wassertropfen mit animiertem Füllstand
+// Wassertropfen mit animiertem Füllstand + Wellenbewegung
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -216,17 +277,14 @@ internal fun WaterDrop(
     fillFraction: Float,
     modifier: Modifier = Modifier
 ) {
-    // Wasserstand: weich animieren wenn fillFraction sich ändert
     val animatedFill by animateFloatAsState(
         targetValue   = fillFraction.coerceIn(0f, 1f),
         animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
         label         = "waterFill"
     )
 
-    // Endlos-Animation für die Wellenbewegung
     val infiniteTransition = rememberInfiniteTransition(label = "waterWave")
 
-    // Phasen-Offset für die erste Welle (volle Periode in 2,4 s)
     val wavePhase by infiniteTransition.animateFloat(
         initialValue  = 0f,
         targetValue   = (2f * PI).toFloat(),
@@ -236,9 +294,8 @@ internal fun WaterDrop(
         label = "wavePhase"
     )
 
-    // Zweite Welle etwas versetzt – gibt Tiefenwirkung
     val wavePhase2 by infiniteTransition.animateFloat(
-        initialValue  = (PI).toFloat(),
+        initialValue  = PI.toFloat(),
         targetValue   = (3f * PI).toFloat(),
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 3200, easing = LinearEasing)
@@ -246,7 +303,6 @@ internal fun WaterDrop(
         label = "wavePhase2"
     )
 
-    // Blasen-Offset: treibt dezent nach oben (0→1 in ~4 s)
     val bubbleRise by infiniteTransition.animateFloat(
         initialValue  = 0f,
         targetValue   = 1f,
@@ -257,83 +313,94 @@ internal fun WaterDrop(
     )
 
     Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-
+        val w        = size.width
+        val h        = size.height
         val dropPath = buildDropPath(w, h)
 
-        // Clip auf Tropfen-Form
         clipPath(dropPath) {
-            // Dunkler Hintergrund
-            drawPath(path = dropPath, color = Color(0xFF1E3A50))
+            // Dunkler Tropfen-Hintergrund
+            drawPath(path = dropPath, color = DropBackground)
 
             val waterTopY = h * (1f - animatedFill)
 
-            // ---- Welle 1 (vordere, helle Welle) ----
-            val wavePath1 = buildWavePath(
-                w          = w,
-                h          = h,
-                waterTopY  = waterTopY,
-                amplitude  = h * 0.04f,
-                frequency  = 1.5f,
-                phaseShift = wavePhase
-            )
+            // Welle 1 – helle Vorderwelle
             drawPath(
-                path  = wavePath1,
+                path  = buildWavePath(
+                    w          = w,
+                    h          = h,
+                    waterTopY  = waterTopY,
+                    amplitude  = h * 0.042f,
+                    frequency  = 1.5f,
+                    phaseShift = wavePhase
+                ),
                 brush = Brush.verticalGradient(
-                    colors = listOf(WaterTop.copy(alpha = 0.9f), WaterBottom),
+                    colors = listOf(WaterTop.copy(alpha = 0.92f), WaterBottom),
                     startY = waterTopY,
                     endY   = h
                 )
             )
 
-            // ---- Welle 2 (hintere, dunklere Welle, leicht versetzt) ----
-            val wavePath2 = buildWavePath(
-                w          = w,
-                h          = h,
-                waterTopY  = waterTopY + h * 0.025f,
-                amplitude  = h * 0.03f,
-                frequency  = 1.2f,
-                phaseShift = wavePhase2
-            )
+            // Welle 2 – dunklere Hinterwelle
             drawPath(
-                path  = wavePath2,
+                path  = buildWavePath(
+                    w          = w,
+                    h          = h,
+                    waterTopY  = waterTopY + h * 0.028f,
+                    amplitude  = h * 0.032f,
+                    frequency  = 1.2f,
+                    phaseShift = wavePhase2
+                ),
                 brush = Brush.verticalGradient(
-                    colors = listOf(WaterBottom.copy(alpha = 0.7f), WaterBottom),
+                    colors = listOf(WaterBottom.copy(alpha = 0.65f), WaterBottom),
                     startY = waterTopY,
                     endY   = h
                 )
             )
 
-            // ---- Dezente Blasen (nur sichtbar wenn Wasser > 20 %) ----
+            // Dezente innere Reflexion (weißer Schimmer oben im Wasser)
+            if (animatedFill > 0.05f) {
+                drawRect(
+                    brush   = Brush.verticalGradient(
+                        colors = listOf(Color.White.copy(alpha = 0.06f), Color.Transparent),
+                        startY = waterTopY,
+                        endY   = waterTopY + h * 0.12f
+                    ),
+                    topLeft = Offset(0f, waterTopY),
+                    size    = Size(w, h * 0.12f)
+                )
+            }
+
+            // Blasen
             if (animatedFill > 0.2f) {
-                drawBubbles(
-                    w         = w,
-                    h         = h,
-                    waterTopY = waterTopY,
-                    riseOffset = bubbleRise
-                )
+                drawBubbles(w = w, h = h, waterTopY = waterTopY, riseOffset = bubbleRise)
             }
         }
 
-        // Tropfen-Umriss
+        // Tropfen-Umriss – leicht breiter für bessere Sichtbarkeit
         drawPath(
             path  = dropPath,
             color = DropOutline,
-            style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
+            style = Stroke(width = 2.8.dp.toPx(), cap = StrokeCap.Round)
         )
 
-        // Glanz-Highlight oben links
+        // Äußeres Leuchten um den Tropfen
+        drawPath(
+            path  = dropPath,
+            color = DropOutline.copy(alpha = 0.12f),
+            style = Stroke(width = 7.dp.toPx(), cap = StrokeCap.Round)
+        )
+
+        // Glanz-Highlight
         drawCircle(
-            color  = Color.White.copy(alpha = 0.22f),
+            color  = Color.White.copy(alpha = 0.20f),
             radius = w * 0.08f,
-            center = Offset(w * 0.35f, h * 0.28f)
+            center = Offset(w * 0.34f, h * 0.27f)
         )
     }
 }
 
 // ---------------------------------------------------------------------------
-// Wellen-Path aufbauen (Sinus-Kurve über die Breite)
+// Wellen-Path (Sinus-Kurve)
 // ---------------------------------------------------------------------------
 
 private fun buildWavePath(
@@ -344,130 +411,136 @@ private fun buildWavePath(
     frequency: Float,
     phaseShift: Float
 ): Path = Path().apply {
-    val steps = 64
-    moveTo(0f, h)                          // unten links starten
-    lineTo(0f, waterTopY)                  // hoch zur Wasseroberfläche links
+    val steps = 80   // mehr Schritte = glattere Kurve
+    moveTo(0f, h)
+    lineTo(0f, waterTopY)
 
     for (i in 0..steps) {
         val x = w * i / steps
-        val y = waterTopY + amplitude * sin(frequency * 2f * PI.toFloat() * (i.toFloat() / steps) + phaseShift)
+        val y = waterTopY + amplitude * sin(
+            frequency * 2f * PI.toFloat() * (i.toFloat() / steps) + phaseShift
+        )
         if (i == 0) moveTo(x, y) else lineTo(x, y)
     }
 
-    lineTo(w, h)   // unten rechts
+    lineTo(w, h)
     close()
 }
 
 // ---------------------------------------------------------------------------
-// Dezente Blasen zeichnen
+// Blasen
 // ---------------------------------------------------------------------------
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBubbles(
+private fun DrawScope.drawBubbles(
     w: Float,
     h: Float,
     waterTopY: Float,
     riseOffset: Float
 ) {
-    // Feste Blasen-Definitionen: (x-Anteil, Starttiefe-Anteil, Radius)
+    data class Bubble(val xFrac: Float, val depthFrac: Float, val radius: Float)
+
     val bubbles = listOf(
-        Triple(0.28f, 0.75f, w * 0.025f),
-        Triple(0.60f, 0.55f, w * 0.018f),
-        Triple(0.45f, 0.85f, w * 0.015f),
-        Triple(0.72f, 0.65f, w * 0.022f)
+        Bubble(0.28f, 0.75f, w * 0.025f),
+        Bubble(0.60f, 0.55f, w * 0.018f),
+        Bubble(0.45f, 0.85f, w * 0.015f),
+        Bubble(0.72f, 0.65f, w * 0.022f)
     )
 
     val waterHeight = h - waterTopY
+    if (waterHeight <= 0f) return
 
-    for ((xFrac, depthFrac, radius) in bubbles) {
-        val bx = w * xFrac
-        // Blase steigt: depthFrac gibt Startposition an, riseOffset bewegt sie hoch
-        val rawY = waterTopY + waterHeight * depthFrac - waterHeight * riseOffset
-        // Wrap-around: sobald Blase oben raus ist, taucht sie unten wieder auf
-        val by  = waterTopY + ((rawY - waterTopY).mod(waterHeight))
+    for (b in bubbles) {
+        val bx   = w * b.xFrac
+        val rawY = waterTopY + waterHeight * b.depthFrac - waterHeight * riseOffset
+        val by   = waterTopY + ((rawY - waterTopY).mod(waterHeight))
 
-        // Nur zeichnen wenn innerhalb des Wasserbereichs
-        if (by > waterTopY && by < h - radius) {
+        if (by > waterTopY + b.radius && by < h - b.radius) {
             drawCircle(
-                color  = Color.White.copy(alpha = 0.15f),
-                radius = radius,
+                color  = Color.White.copy(alpha = 0.14f),
+                radius = b.radius,
                 center = Offset(bx, by),
-                style  = Stroke(width = 1.dp.toPx())
+                style  = Stroke(width = 1.2.dp.toPx())
             )
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Hilfsfunktion: Tropfen-Path aufbauen
+// Tropfen-Path
 // ---------------------------------------------------------------------------
 
 private fun buildDropPath(w: Float, h: Float): Path = Path().apply {
-    // Spitze unten, Kreis oben – klassische Tropfenform
-    val cx = w / 2f
-    // Kreis-Radius: oberes Drittel
+    val cx       = w / 2f
     val circleR  = w * 0.42f
     val circleCy = h * 0.38f
-    // Spitze unten
     val tipY     = h * 0.97f
 
-    // Starte an der linken Seite des Kreises (unten)
     moveTo(cx - circleR * 0.85f, circleCy + circleR * 0.5f)
 
-    // Kurve zur Spitze (links)
     cubicTo(
         cx - circleR * 0.9f, circleCy + circleR * 0.9f,
         cx - circleR * 0.3f, tipY - h * 0.08f,
         cx, tipY
     )
-
-    // Kurve von Spitze nach rechts oben
     cubicTo(
         cx + circleR * 0.3f, tipY - h * 0.08f,
         cx + circleR * 0.9f, circleCy + circleR * 0.9f,
         cx + circleR * 0.85f, circleCy + circleR * 0.5f
     )
-
-    // Oberer Kreisbogen
     arcTo(
-        rect      = Rect(
-            center = Offset(cx, circleCy),
-            radius = circleR
-        ),
-        startAngleDegrees  = 30f,
-        sweepAngleDegrees  = -240f,
-        forceMoveTo        = false
+        rect              = Rect(center = Offset(cx, circleCy), radius = circleR),
+        startAngleDegrees = 30f,
+        sweepAngleDegrees = -240f,
+        forceMoveTo       = false
     )
 
     close()
 }
 
 // ---------------------------------------------------------------------------
-// Texte: Menge & Ziel
+// Texte: Label + Menge + Ziel + Prozent
 // ---------------------------------------------------------------------------
 
 @Composable
 private fun ProgressValueText(
     totalMl: Int,
-    goalMl: Int
+    goalMl: Int,
+    progress: Float
 ) {
+    val percent = (progress * 100f).toInt()
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Dezentes Label
+        Text(
+            text       = "Heute getrunken",
+            fontSize   = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color      = TextLabel,
+            letterSpacing = 1.5.sp
+        )
+
+        Spacer(Modifier.height(4.dp))
+
+        // Große Zahl
         Text(
             text       = formatMl(totalMl),
-            fontSize   = 48.sp,
-            fontWeight = FontWeight.Bold,
+            fontSize   = 52.sp,
+            fontWeight = FontWeight.ExtraBold,
             color      = TextPrimary,
-            lineHeight = 52.sp
+            lineHeight = 56.sp
         )
+
+        // Ziel + Prozent in einer Zeile
         Text(
-            text     = "/ ${formatMl(goalMl)} mL",
-            fontSize = 16.sp,
+            text     = "/ ${formatMl(goalMl)} mL  ·  $percent %",
+            fontSize = 14.sp,
             color    = TextSecondary
         )
     }
 }
 
 // ---------------------------------------------------------------------------
-// Hilfsfunktion: ml-Wert formatieren (z. B. 1250 → "1.250")
+// Hilfsfunktion: ml formatieren (1250 → "1.250")
 // ---------------------------------------------------------------------------
 
 private fun formatMl(ml: Int): String =
@@ -477,33 +550,38 @@ private fun formatMl(ml: Int): String =
 // Previews
 // ---------------------------------------------------------------------------
 
-@Preview(name = "50 % Fortschritt", showBackground = true, backgroundColor = 0xFF0F1923)
+@Preview(name = "0 % – Leer", showBackground = true, backgroundColor = 0xFF0D1620)
 @Composable
-private fun HydrationProgressCardPreview50() {
-    HydrationProgressCard(
-        totalMl = 1250,
-        goalMl  = 2500,
-        modifier = Modifier.padding(16.dp)
-    )
+private fun PreviewEmpty() {
+    HydrationProgressCard(totalMl = 0, goalMl = 2500, modifier = Modifier.padding(16.dp))
 }
 
-@Preview(name = "0 % Fortschritt", showBackground = true, backgroundColor = 0xFF0F1923)
+@Preview(name = "25 % – Wenig", showBackground = true, backgroundColor = 0xFF0D1620)
 @Composable
-private fun HydrationProgressCardPreview0() {
-    HydrationProgressCard(
-        totalMl = 0,
-        goalMl  = 2500,
-        modifier = Modifier.padding(16.dp)
-    )
+private fun PreviewQuarter() {
+    HydrationProgressCard(totalMl = 625, goalMl = 2500, modifier = Modifier.padding(16.dp))
 }
 
-@Preview(name = "100 % Fortschritt", showBackground = true, backgroundColor = 0xFF0F1923)
+@Preview(name = "50 % – Halb", showBackground = true, backgroundColor = 0xFF0D1620)
 @Composable
-private fun HydrationProgressCardPreview100() {
-    HydrationProgressCard(
-        totalMl = 2500,
-        goalMl  = 2500,
-        modifier = Modifier.padding(16.dp)
-    )
+private fun PreviewHalf() {
+    HydrationProgressCard(totalMl = 1250, goalMl = 2500, modifier = Modifier.padding(16.dp))
 }
 
+@Preview(name = "75 % – Gut dabei", showBackground = true, backgroundColor = 0xFF0D1620)
+@Composable
+private fun PreviewThreeQuarters() {
+    HydrationProgressCard(totalMl = 1875, goalMl = 2500, modifier = Modifier.padding(16.dp))
+}
+
+@Preview(name = "100 % – Ziel erreicht", showBackground = true, backgroundColor = 0xFF0D1620)
+@Composable
+private fun PreviewFull() {
+    HydrationProgressCard(totalMl = 2500, goalMl = 2500, modifier = Modifier.padding(16.dp))
+}
+
+@Preview(name = "Überschritten – Clamp-Test", showBackground = true, backgroundColor = 0xFF0D1620)
+@Composable
+private fun PreviewOverflow() {
+    HydrationProgressCard(totalMl = 9999, goalMl = 2500, modifier = Modifier.padding(16.dp))
+}
