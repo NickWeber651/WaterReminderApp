@@ -1,5 +1,8 @@
 package de.nick.waterreminderapp.ui.home
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -46,6 +50,23 @@ private val TextPrimary       = Color(0xFFE8F4FD)
 private val TextSecondary     = Color(0xFF90B4CE)
 
 // ---------------------------------------------------------------------------
+// Fortschrittslogik (rein, testbar)
+// ---------------------------------------------------------------------------
+
+/**
+ * Berechnet den Hydrations-Fortschritt als Float im Bereich [0, 1].
+ *
+ * Edge Cases:
+ * - goalMl <= 0  → 0f (kein Ziel definiert)
+ * - totalMl < 0  → 0f (negativer Wert unmöglich)
+ * - totalMl > goalMl → 1f (Ziel erreicht / überschritten)
+ */
+internal fun calculateProgress(totalMl: Int, goalMl: Int): Float {
+    if (goalMl <= 0 || totalMl <= 0) return 0f
+    return (totalMl.toFloat() / goalMl.toFloat()).coerceIn(0f, 1f)
+}
+
+// ---------------------------------------------------------------------------
 // Öffentliches Composable
 // ---------------------------------------------------------------------------
 
@@ -63,7 +84,7 @@ fun HydrationProgressCard(
     goalMl: Int,
     modifier: Modifier = Modifier
 ) {
-    val progress = if (goalMl > 0) (totalMl.toFloat() / goalMl.toFloat()).coerceIn(0f, 1f) else 0f
+    val progress = calculateProgress(totalMl, goalMl)
 
     Surface(
         modifier      = modifier.fillMaxWidth(),
@@ -129,6 +150,16 @@ private fun HydrationRing(
     progress: Float,
     modifier: Modifier = Modifier
 ) {
+    // Weiche Animation: beim ersten Einblenden und bei Wertänderungen
+    val animatedProgress by animateFloatAsState(
+        targetValue  = progress,
+        animationSpec = tween(
+            durationMillis = 800,
+            easing         = FastOutSlowInEasing
+        ),
+        label = "ringProgress"
+    )
+
     Canvas(modifier = modifier) {
         val strokeWidth = 18.dp.toPx()
         val inset       = strokeWidth / 2f
@@ -153,14 +184,14 @@ private fun HydrationRing(
         )
 
         // Fortschritts-Bogen
-        if (progress > 0f) {
+        if (animatedProgress > 0f) {
             drawArc(
                 brush      = Brush.sweepGradient(
                     0.0f to RingProgressStart,
                     1.0f to RingProgressEnd
                 ),
                 startAngle = startAngle,
-                sweepAngle = sweepTotal * progress,
+                sweepAngle = sweepTotal * animatedProgress,
                 useCenter  = false,
                 topLeft    = arcRect.topLeft,
                 size       = arcRect.size,
