@@ -222,35 +222,35 @@ private fun HydrationRing(
         )
 
         if (animatedProgress > 0f) {
-            val sweepAngle  = GAUGE_SWEEP * animatedProgress
-            val amplitude   = strokePx * 0.30f   // Wellenamplitude: 30 % der Strichbreite
-            val steps       = 120                 // Punkte für glatte Kurve
+            val sweepAngle = GAUGE_SWEEP * animatedProgress
+            // Sehr kleine Amplitude: Linie bleibt sauber, Bewegung ist subtil
+            val amplitude  = 2.2f.dp.toPx()
+            val steps      = 160   // viele Punkte → glatte Kurve
 
-            // Hilfsfunktion: Wellenpfad entlang des Bogens
-            // Die Welle schwingt radial (innen/außen), nicht tangential
-            fun buildArcWavePath(phase: Float): Path = Path().apply {
+            // Wellenpfad: Sinus läuft radial (innen/außen) entlang des Bogens
+            fun buildArcWavePath(phase: Float, freq: Float): Path = Path().apply {
                 for (i in 0..steps) {
-                    val t         = i.toFloat() / steps
-                    val angleDeg  = GAUGE_START_ANGLE + sweepAngle * t
-                    val angleRad  = Math.toRadians(angleDeg.toDouble()).toFloat()
-                    val wave      = amplitude * sin(2f * PI.toFloat() * t * 3f + phase)
-                    val rWave     = r + wave
-                    val x         = cx + rWave * cos(angleRad)
-                    val y         = cy + rWave * sin(angleRad)
+                    val t        = i.toFloat() / steps
+                    val angleDeg = GAUGE_START_ANGLE + sweepAngle * t
+                    val angleRad = Math.toRadians(angleDeg.toDouble()).toFloat()
+                    val wave     = amplitude * sin(2f * PI.toFloat() * t * freq + phase)
+                    val rWave    = r + wave
+                    val x        = cx + rWave * cos(angleRad)
+                    val y        = cy + rWave * sin(angleRad)
                     if (i == 0) moveTo(x, y) else lineTo(x, y)
                 }
             }
 
-            // ---- Welle 2: dunklere Hinterwelle (wie beim Tropfen) ----
+            // Hinterwelle: etwas dunkler, leicht versetzt
             drawPath(
-                path  = buildArcWavePath(wavePhase2),
-                color = RingProgressEnd.copy(alpha = 0.55f),
-                style = Stroke(width = strokePx * 0.65f, cap = StrokeCap.Round)
+                path  = buildArcWavePath(wavePhase2, freq = 6f),
+                color = RingProgressEnd.copy(alpha = 0.60f),
+                style = Stroke(width = strokePx, cap = StrokeCap.Round)
             )
 
-            // ---- Welle 1: helle Vorderwelle ----
+            // Vorderwelle: volle Helligkeit mit Gradient
             drawPath(
-                path  = buildArcWavePath(wavePhase1),
+                path  = buildArcWavePath(wavePhase1, freq = 6f),
                 brush = Brush.sweepGradient(
                     0.0f  to RingProgressStart,
                     0.65f to RingProgressEnd,
