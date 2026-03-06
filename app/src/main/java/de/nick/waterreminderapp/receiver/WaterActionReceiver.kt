@@ -8,6 +8,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import de.nick.waterreminderapp.data.DataStoreIntakeRepository
 import de.nick.waterreminderapp.data.IntakeStore
 import de.nick.waterreminderapp.data.SettingsStore
 import de.nick.waterreminderapp.notification.NotificationHelper
@@ -38,13 +39,15 @@ class WaterActionReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val intakeStore        = IntakeStore(context)
+                val repository         = DataStoreIntakeRepository.create(context)
+                val intakeStore        = IntakeStore(context)   // nur noch für congratsSent
                 val notificationHelper = NotificationHelper(context)
 
-                intakeStore.addMl(250)
+                repository.addEntry(250)
 
-                val goalMl       = SettingsStore(context).settingsFlow.first().goalMl
-                val goalReached  = intakeStore.hasReachedGoal(goalMl)
+                val settings     = SettingsStore(context).settingsFlow.first()
+                val totalMl      = repository.totalMlTodayFlow.first()
+                val goalReached  = totalMl >= settings.goalMl
                 val congratsSent = intakeStore.isCongratsSentToday()
 
                 if (goalReached && !congratsSent) {

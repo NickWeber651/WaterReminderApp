@@ -8,7 +8,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
 import androidx.work.workDataOf
-import de.nick.waterreminderapp.data.IntakeStore
+import de.nick.waterreminderapp.data.DataStoreIntakeRepository
 import de.nick.waterreminderapp.notification.FakeNotificationSender
 import de.nick.waterreminderapp.util.FakeTimeProvider
 import kotlinx.coroutines.runBlocking
@@ -116,8 +116,8 @@ class WaterReminderWorkerTest {
     @Test fun `Tagesziel erreicht - keine Notification`() {
         fakeTime.setHour(10)
         runBlocking {
-            val store = IntakeStore(context, fakeTime)
-            repeat(8) { store.addMl(250) } // 8 × 250 = 2000 ml
+            val repo = DataStoreIntakeRepository.create(context, fakeTime)
+            repeat(8) { repo.addEntry(250) } // 8 × 250 = 2000 ml
         }
         runWorker()
         assertTrue(fakeSender.reminderCalls.isEmpty())

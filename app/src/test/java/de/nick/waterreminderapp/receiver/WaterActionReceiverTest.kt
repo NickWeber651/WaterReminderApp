@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.work.Configuration
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
+import de.nick.waterreminderapp.data.DataStoreIntakeRepository
 import de.nick.waterreminderapp.data.IntakeStore
 import de.nick.waterreminderapp.util.FakeTimeProvider
 import de.nick.waterreminderapp.worker.WaterWorkerFactory
@@ -55,29 +56,31 @@ class WaterActionReceiverTest {
     }
 
     @Test fun `DRANK erhoeht Intake um 250 ml`() {
-        val store  = IntakeStore(context)
-        val before = runBlocking { store.totalMlTodayFlow.first() }
+        val repo   = DataStoreIntakeRepository.create(context)
+        val before = runBlocking { repo.totalMlTodayFlow.first() }
         sendDrank()
-        assertEquals(before + 250, runBlocking { store.totalMlTodayFlow.first() })
+        assertEquals(before + 250, runBlocking { repo.totalMlTodayFlow.first() })
     }
 
     @Test fun `DRANK dreimal ergibt 750 ml mehr`() {
-        val store  = IntakeStore(context)
-        val before = runBlocking { store.totalMlTodayFlow.first() }
+        val repo   = DataStoreIntakeRepository.create(context)
+        val before = runBlocking { repo.totalMlTodayFlow.first() }
         sendDrank(); sendDrank(); sendDrank()
-        assertEquals(before + 750, runBlocking { store.totalMlTodayFlow.first() })
+        assertEquals(before + 750, runBlocking { repo.totalMlTodayFlow.first() })
     }
 
     @Test fun `DRANK bei Zielerreichen setzt congratsSent`() {
-        val store = IntakeStore(context)
-        runBlocking { repeat(7) { store.addMl(250) } }
+        val repo  = DataStoreIntakeRepository.create(context)
+        val store = IntakeStore(context)  // congratsSent bleibt im alten Store
+        runBlocking { repeat(7) { repo.addEntry(250) } }
         sendDrank()
         assertTrue(runBlocking { store.isCongratsSentToday() })
     }
 
     @Test fun `DRANK nach congratsSent aendert Status nicht`() {
+        val repo  = DataStoreIntakeRepository.create(context)
         val store = IntakeStore(context)
-        runBlocking { repeat(8) { store.addMl(250) }; store.markCongratsSent() }
+        runBlocking { repeat(8) { repo.addEntry(250) }; store.markCongratsSent() }
         sendDrank()
         assertTrue(runBlocking { store.isCongratsSentToday() })
     }

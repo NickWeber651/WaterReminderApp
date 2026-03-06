@@ -8,7 +8,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import de.nick.waterreminderapp.data.IntakeStore
+import de.nick.waterreminderapp.data.DataStoreIntakeRepository
 import de.nick.waterreminderapp.data.SettingsStore
 import de.nick.waterreminderapp.notification.NotificationHelper
 import de.nick.waterreminderapp.notification.NotificationSender
@@ -53,9 +53,10 @@ class WaterReminderWorker(
             return Result.success()
         }
 
-        val intakeStore = IntakeStore(applicationContext, timeProvider)
-        val goalReached = intakeStore.hasReachedGoal(settings.goalMl)
-        Log.d(TAG, "📊 goalReached=$goalReached (goal=${settings.goalMl} ml)")
+        val repository  = DataStoreIntakeRepository.create(applicationContext, timeProvider)
+        val totalMl     = repository.totalMlTodayFlow.first()
+        val goalReached = totalMl >= settings.goalMl
+        Log.d(TAG, "📊 goalReached=$goalReached (goal=${settings.goalMl} ml, total=$totalMl ml)")
 
         if (!goalReached) {
             val allowSnooze = source != SOURCE_SNOOZE
