@@ -200,11 +200,22 @@ private fun HydrationRing(
 
         // ---- Fortschrittsbogen mit Gradient ----
         if (animatedProgress > 0f) {
+            // sweepGradient startet bei 0° (rechts), unser Bogen bei 150° (GAUGE_START_ANGLE).
+            // Farbstops müssen auf die reale Bogenposition normiert werden:
+            //   Bogenstart = 150° → 150/360 = 0.417
+            //   Bogenende  = 150°+240° = 390° → 390/360 = 1.083 → wraps zu 0.083
+            // Da sweepGradient 0→1 = 0°→360°: Start bei ~0.42, Ende bei ~0.08 (wrap).
+            val startFrac = GAUGE_START_ANGLE / 360f                        // 0.417
+            val endFrac   = (GAUGE_START_ANGLE + GAUGE_SWEEP) / 360f % 1f   // 0.083
+
             drawArc(
                 brush      = Brush.sweepGradient(
-                    0.0f  to RingProgressStart,
-                    0.65f to RingProgressEnd,
-                    1.0f  to RingProgressEnd
+                    // Vor dem Bogen: Startfarbe (damit der Anfang bei 150° stimmt)
+                    0.0f      to RingProgressEnd,
+                    endFrac   to RingProgressEnd,     // 0→30° = Ende des Bogens (dunkles Blau)
+                    startFrac to RingProgressStart,   // 150° = Anfang des Bogens (helles Aqua)
+                    0.8f      to RingProgressEnd,     // Mitte → dunkel
+                    1.0f      to RingProgressEnd      // wrap zurück
                 ),
                 startAngle = GAUGE_START_ANGLE,
                 sweepAngle = GAUGE_SWEEP * animatedProgress,
