@@ -20,8 +20,14 @@ class AppRoutesTest {
     }
 
     @Test
-    fun homeUndSettingsSindVerschieden() {
-        assert(AppRoutes.HOME != AppRoutes.SETTINGS)
+    fun historyRouteHatKorrektenWert() {
+        assertEquals("history", AppRoutes.HISTORY)
+    }
+
+    @Test
+    fun alleRoutenSindVerschieden() {
+        val routes = listOf(AppRoutes.HOME, AppRoutes.SETTINGS, AppRoutes.HISTORY)
+        assertEquals("Alle Routen müssen eindeutig sein", routes.size, routes.distinct().size)
     }
 }
 
