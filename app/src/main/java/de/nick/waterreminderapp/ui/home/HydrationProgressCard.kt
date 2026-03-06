@@ -27,6 +27,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -225,58 +226,64 @@ private fun HydrationRing(
 
         if (animatedProgress > 0f) {
             val sweepAngle = GAUGE_SWEEP * animatedProgress
-            // Amplitude: ~25 % der Strichbreite – klar sichtbar aber kein Schlangeneffekt
-            val amp = strokePx * 0.25f
+            val amp        = strokePx * 0.35f  // Amplitude – clipPath schneidet Überstände sauber ab
 
-            /**
-             * Baut einen gefüllten Ringabschnitt:
-             * - Außenkante: Radius rOuter + Sinuswelle
-             * - Innenkante: Radius rInner (glatt, kein Wellen)
-             * Vorwärts durch die Außenkante, rückwärts durch die Innenkante → geschlossene Fläche
-             */
+            // ---- Clip-Pfad: Donut exakt zwischen rInner und rOuter ----
+            // Außenkreis vorwärts + Innenkreis rückwärts → Even-Odd füllt nur den Ring
+            val clipRing = Path().apply {
+                // Äußerer Begrenzungskreis (voller Kreis)
+                addOval(Rect(
+                    center = Offset(cx, cy),
+                    radius = rOuter + amp  // etwas Puffer damit Clip nicht die Welle abschneidet
+                ))
+                // Innerer Begrenzungskreis (Loch)
+                addOval(Rect(
+                    center = Offset(cx, cy),
+                    radius = rInner - amp
+                ))
+            }
+
+            // Wellen-Flächen-Pfad: Vorwärts Außenkante (wellig) + Rückwärts Innenkante (glatt)
             fun buildFilledArcWave(phase: Float): Path = Path().apply {
-                // Vorwärts: Außenkante mit Welle
                 for (i in 0..steps) {
                     val t        = i.toFloat() / steps
                     val angleDeg = GAUGE_START_ANGLE + sweepAngle * t
                     val angleRad = Math.toRadians(angleDeg.toDouble()).toFloat()
                     val wave     = amp * sin(2f * PI.toFloat() * t * 4f + phase)
-                    val rw       = rOuter + wave
-                    val x        = cx + rw * cos(angleRad)
-                    val y        = cy + rw * sin(angleRad)
+                    val x        = cx + (rOuter + wave) * cos(angleRad)
+                    val y        = cy + (rOuter + wave) * sin(angleRad)
                     if (i == 0) moveTo(x, y) else lineTo(x, y)
                 }
-                // Rückwärts: Innenkante glatt
                 for (i in steps downTo 0) {
                     val t        = i.toFloat() / steps
                     val angleDeg = GAUGE_START_ANGLE + sweepAngle * t
                     val angleRad = Math.toRadians(angleDeg.toDouble()).toFloat()
-                    val x        = cx + rInner * cos(angleRad)
-                    val y        = cy + rInner * sin(angleRad)
-                    lineTo(x, y)
+                    lineTo(cx + rInner * cos(angleRad), cy + rInner * sin(angleRad))
                 }
                 close()
             }
 
-            // Hinterwelle: dunkler, leicht versetzt (wie 2. Welle im Tropfen)
-            drawPath(
-                path  = buildFilledArcWave(wavePhase2),
-                brush = Brush.sweepGradient(
-                    0.0f  to RingProgressEnd.copy(alpha = 0.7f),
-                    0.65f to RingProgressEnd.copy(alpha = 0.5f),
-                    1.0f  to RingProgressEnd.copy(alpha = 0.5f)
+            // clipPath sorgt dafür dass Wellen nie aus dem Ring herausragen
+            clipPath(clipRing, clipOp = ClipOp.Intersect) {
+                // Hinterwelle
+                drawPath(
+                    path  = buildFilledArcWave(wavePhase2),
+                    brush = Brush.sweepGradient(
+                        0.0f  to RingProgressEnd.copy(alpha = 0.65f),
+                        0.65f to RingProgressEnd.copy(alpha = 0.50f),
+                        1.0f  to RingProgressEnd.copy(alpha = 0.50f)
+                    )
                 )
-            )
-
-            // Vorderwelle: hell, kräftige Farben
-            drawPath(
-                path  = buildFilledArcWave(wavePhase1),
-                brush = Brush.sweepGradient(
-                    0.0f  to RingProgressStart.copy(alpha = 0.92f),
-                    0.65f to RingProgressEnd.copy(alpha = 0.92f),
-                    1.0f  to RingProgressEnd.copy(alpha = 0.92f)
+                // Vorderwelle
+                drawPath(
+                    path  = buildFilledArcWave(wavePhase1),
+                    brush = Brush.sweepGradient(
+                        0.0f  to RingProgressStart.copy(alpha = 0.92f),
+                        0.65f to RingProgressEnd.copy(alpha = 0.92f),
+                        1.0f  to RingProgressEnd.copy(alpha = 0.92f)
+                    )
                 )
-            )
+            }
         }
     }
 }
