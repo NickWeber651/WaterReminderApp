@@ -1,7 +1,11 @@
 package de.nick.waterreminderapp.ui.home
 
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +38,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
+import kotlin.math.PI
+import kotlin.math.sin
 
 // ---------------------------------------------------------------------------
 // Farben
@@ -202,7 +208,7 @@ private fun HydrationRing(
 }
 
 // ---------------------------------------------------------------------------
-// Wassertropfen mit statischem Füllstand
+// Wassertropfen mit animiertem Füllstand
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -210,31 +216,104 @@ internal fun WaterDrop(
     fillFraction: Float,
     modifier: Modifier = Modifier
 ) {
+    // Wasserstand: weich animieren wenn fillFraction sich ändert
+    val animatedFill by animateFloatAsState(
+        targetValue   = fillFraction.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+        label         = "waterFill"
+    )
+
+    // Endlos-Animation für die Wellenbewegung
+    val infiniteTransition = rememberInfiniteTransition(label = "waterWave")
+
+    // Phasen-Offset für die erste Welle (volle Periode in 2,4 s)
+    val wavePhase by infiniteTransition.animateFloat(
+        initialValue  = 0f,
+        targetValue   = (2f * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2400, easing = LinearEasing)
+        ),
+        label = "wavePhase"
+    )
+
+    // Zweite Welle etwas versetzt – gibt Tiefenwirkung
+    val wavePhase2 by infiniteTransition.animateFloat(
+        initialValue  = (PI).toFloat(),
+        targetValue   = (3f * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 3200, easing = LinearEasing)
+        ),
+        label = "wavePhase2"
+    )
+
+    // Blasen-Offset: treibt dezent nach oben (0→1 in ~4 s)
+    val bubbleRise by infiniteTransition.animateFloat(
+        initialValue  = 0f,
+        targetValue   = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 4000, easing = LinearEasing)
+        ),
+        label = "bubbleRise"
+    )
+
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
 
-        // Tropfen-Path
         val dropPath = buildDropPath(w, h)
 
         // Clip auf Tropfen-Form
         clipPath(dropPath) {
-            // Hintergrund des Tropfens (dunkler Rumpf)
+            // Dunkler Hintergrund
             drawPath(path = dropPath, color = Color(0xFF1E3A50))
 
-            // Wasserstand: fillFraction 0 = leer, 1 = voll
-            // Wasser füllt von unten auf
-            val waterTop = h * (1f - fillFraction.coerceIn(0f, 1f))
+            val waterTopY = h * (1f - animatedFill)
 
-            drawRect(
-                brush  = Brush.verticalGradient(
-                    colors    = listOf(WaterTop, WaterBottom),
-                    startY    = waterTop,
-                    endY      = h
-                ),
-                topLeft = Offset(0f, waterTop),
-                size    = Size(w, h - waterTop)
+            // ---- Welle 1 (vordere, helle Welle) ----
+            val wavePath1 = buildWavePath(
+                w          = w,
+                h          = h,
+                waterTopY  = waterTopY,
+                amplitude  = h * 0.04f,
+                frequency  = 1.5f,
+                phaseShift = wavePhase
             )
+            drawPath(
+                path  = wavePath1,
+                brush = Brush.verticalGradient(
+                    colors = listOf(WaterTop.copy(alpha = 0.9f), WaterBottom),
+                    startY = waterTopY,
+                    endY   = h
+                )
+            )
+
+            // ---- Welle 2 (hintere, dunklere Welle, leicht versetzt) ----
+            val wavePath2 = buildWavePath(
+                w          = w,
+                h          = h,
+                waterTopY  = waterTopY + h * 0.025f,
+                amplitude  = h * 0.03f,
+                frequency  = 1.2f,
+                phaseShift = wavePhase2
+            )
+            drawPath(
+                path  = wavePath2,
+                brush = Brush.verticalGradient(
+                    colors = listOf(WaterBottom.copy(alpha = 0.7f), WaterBottom),
+                    startY = waterTopY,
+                    endY   = h
+                )
+            )
+
+            // ---- Dezente Blasen (nur sichtbar wenn Wasser > 20 %) ----
+            if (animatedFill > 0.2f) {
+                drawBubbles(
+                    w         = w,
+                    h         = h,
+                    waterTopY = waterTopY,
+                    riseOffset = bubbleRise
+                )
+            }
         }
 
         // Tropfen-Umriss
@@ -244,12 +323,77 @@ internal fun WaterDrop(
             style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
         )
 
-        // Kleiner Glanz-Highlight oben links
+        // Glanz-Highlight oben links
         drawCircle(
-            color  = Color.White.copy(alpha = 0.25f),
+            color  = Color.White.copy(alpha = 0.22f),
             radius = w * 0.08f,
             center = Offset(w * 0.35f, h * 0.28f)
         )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Wellen-Path aufbauen (Sinus-Kurve über die Breite)
+// ---------------------------------------------------------------------------
+
+private fun buildWavePath(
+    w: Float,
+    h: Float,
+    waterTopY: Float,
+    amplitude: Float,
+    frequency: Float,
+    phaseShift: Float
+): Path = Path().apply {
+    val steps = 64
+    moveTo(0f, h)                          // unten links starten
+    lineTo(0f, waterTopY)                  // hoch zur Wasseroberfläche links
+
+    for (i in 0..steps) {
+        val x = w * i / steps
+        val y = waterTopY + amplitude * sin(frequency * 2f * PI.toFloat() * (i.toFloat() / steps) + phaseShift)
+        if (i == 0) moveTo(x, y) else lineTo(x, y)
+    }
+
+    lineTo(w, h)   // unten rechts
+    close()
+}
+
+// ---------------------------------------------------------------------------
+// Dezente Blasen zeichnen
+// ---------------------------------------------------------------------------
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBubbles(
+    w: Float,
+    h: Float,
+    waterTopY: Float,
+    riseOffset: Float
+) {
+    // Feste Blasen-Definitionen: (x-Anteil, Starttiefe-Anteil, Radius)
+    val bubbles = listOf(
+        Triple(0.28f, 0.75f, w * 0.025f),
+        Triple(0.60f, 0.55f, w * 0.018f),
+        Triple(0.45f, 0.85f, w * 0.015f),
+        Triple(0.72f, 0.65f, w * 0.022f)
+    )
+
+    val waterHeight = h - waterTopY
+
+    for ((xFrac, depthFrac, radius) in bubbles) {
+        val bx = w * xFrac
+        // Blase steigt: depthFrac gibt Startposition an, riseOffset bewegt sie hoch
+        val rawY = waterTopY + waterHeight * depthFrac - waterHeight * riseOffset
+        // Wrap-around: sobald Blase oben raus ist, taucht sie unten wieder auf
+        val by  = waterTopY + ((rawY - waterTopY).mod(waterHeight))
+
+        // Nur zeichnen wenn innerhalb des Wasserbereichs
+        if (by > waterTopY && by < h - radius) {
+            drawCircle(
+                color  = Color.White.copy(alpha = 0.15f),
+                radius = radius,
+                center = Offset(bx, by),
+                style  = Stroke(width = 1.dp.toPx())
+            )
+        }
     }
 }
 
