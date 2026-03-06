@@ -164,7 +164,7 @@ private fun HydrationGauge(
 }
 
 // ---------------------------------------------------------------------------
-// Halbkreisförmiger Fortschrittsring mit Wasser-Effekt
+// Halbkreisförmiger Fortschrittsring (sauber, schlicht)
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -178,25 +178,6 @@ private fun HydrationRing(
         label         = "ringProgress"
     )
 
-    // Wellenphasen – gleicher Takt wie der Tropfen
-    val infiniteTransition = rememberInfiniteTransition(label = "ringWave")
-    val wavePhase1 by infiniteTransition.animateFloat(
-        initialValue  = 0f,
-        targetValue   = (2f * PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2400, easing = LinearEasing)
-        ),
-        label = "ringWave1"
-    )
-    val wavePhase2 by infiniteTransition.animateFloat(
-        initialValue  = PI.toFloat(),
-        targetValue   = (3f * PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3200, easing = LinearEasing)
-        ),
-        label = "ringWave2"
-    )
-
     Canvas(modifier = modifier) {
         val strokePx = RING_STROKE.toPx()
         val glowPx   = RING_GLOW_STROKE.toPx()
@@ -205,9 +186,6 @@ private fun HydrationRing(
             offset = Offset(inset, inset),
             size   = Size(size.width - glowPx, size.height - glowPx)
         )
-        val cx   = size.width  / 2f
-        val cy   = size.height / 2f
-        val rMid = arcRect.width / 2f
 
         // ---- Track (Hintergrundring) ----
         drawArc(
@@ -220,79 +198,21 @@ private fun HydrationRing(
             style      = Stroke(width = strokePx, cap = StrokeCap.Round)
         )
 
+        // ---- Fortschrittsbogen mit Gradient ----
         if (animatedProgress > 0f) {
-            val sweepAngle = GAUGE_SWEEP * animatedProgress
-
-            // ---- Solider Fortschrittsbogen (Basis) ----
             drawArc(
                 brush      = Brush.sweepGradient(
-                    0.0f  to RingProgressEnd,
+                    0.0f  to RingProgressStart,
                     0.65f to RingProgressEnd,
                     1.0f  to RingProgressEnd
                 ),
                 startAngle = GAUGE_START_ANGLE,
-                sweepAngle = sweepAngle,
+                sweepAngle = GAUGE_SWEEP * animatedProgress,
                 useCenter  = false,
                 topLeft    = arcRect.topLeft,
                 size       = arcRect.size,
                 style      = Stroke(width = strokePx, cap = StrokeCap.Round)
             )
-
-            // ---- Wellenförmige Highlights (innerhalb des Bogens) ----
-            val rInner = rMid - strokePx / 2f
-            val rOuter = rMid + strokePx / 2f
-            val steps  = 160
-            val amp    = strokePx * 0.25f
-
-            // Clip: gefüllter Bandbereich exakt zwischen rInner und rOuter
-            // Vorwärts äußeren Arc + rückwärts inneren Arc = geschlossene Fläche
-            val clipBand = Path().apply {
-                val outerRect = Rect(Offset(cx - rOuter, cy - rOuter), Size(rOuter * 2, rOuter * 2))
-                val innerRect = Rect(Offset(cx - rInner, cy - rInner), Size(rInner * 2, rInner * 2))
-                arcTo(outerRect, GAUGE_START_ANGLE, sweepAngle, true)
-                arcTo(innerRect, GAUGE_START_ANGLE + sweepAngle, -sweepAngle, false)
-                close()
-            }
-
-            // Wellenstreifen: Sinus entlang des Bogens, gefüllt nach oben
-            fun buildWaveStrip(phase: Float, rBase: Float): Path = Path().apply {
-                // Vorwärts: wellige Kante
-                for (i in 0..steps) {
-                    val t        = i.toFloat() / steps
-                    val angleDeg = GAUGE_START_ANGLE + sweepAngle * t
-                    val angleRad = Math.toRadians(angleDeg.toDouble()).toFloat()
-                    val wave     = amp * sin(2f * PI.toFloat() * t * 5f + phase)
-                    val x        = cx + (rBase + wave) * cos(angleRad)
-                    val y        = cy + (rBase + wave) * sin(angleRad)
-                    if (i == 0) moveTo(x, y) else lineTo(x, y)
-                }
-                // Rückwärts: Außenkante (solid)
-                for (i in steps downTo 0) {
-                    val t        = i.toFloat() / steps
-                    val angleDeg = GAUGE_START_ANGLE + sweepAngle * t
-                    val angleRad = Math.toRadians(angleDeg.toDouble()).toFloat()
-                    lineTo(cx + rOuter * cos(angleRad), cy + rOuter * sin(angleRad))
-                }
-                close()
-            }
-
-            // clipPath: alles außerhalb des Ringbandes abschneiden
-            clipPath(clipBand) {
-                // Hinterwelle
-                drawPath(
-                    path  = buildWaveStrip(wavePhase2, rBase = rMid - amp * 0.3f),
-                    color = RingProgressStart.copy(alpha = 0.30f)
-                )
-                // Vorderwelle
-                drawPath(
-                    path  = buildWaveStrip(wavePhase1, rBase = rMid),
-                    brush = Brush.sweepGradient(
-                        0.0f  to RingProgressStart.copy(alpha = 0.6f),
-                        0.65f to RingProgressStart.copy(alpha = 0.35f),
-                        1.0f  to RingProgressStart.copy(alpha = 0.35f)
-                    )
-                )
-            }
         }
     }
 }
