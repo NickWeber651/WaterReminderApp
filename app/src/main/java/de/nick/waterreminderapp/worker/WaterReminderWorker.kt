@@ -1,6 +1,7 @@
 package de.nick.waterreminderapp.worker
 
 import android.content.Context
+import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -27,6 +28,7 @@ class WaterReminderWorker(
 ) : CoroutineWorker(context, params) {
 
     companion object {
+        private const val TAG = "WaterReminderWorker"
         const val KEY_SOURCE            = "source"
         const val KEY_INTERVAL_MINUTES  = "interval_minutes"
         const val WORK_NAME_ONE_TIME    = "water_reminder_one_time"
@@ -34,6 +36,9 @@ class WaterReminderWorker(
     }
 
     override suspend fun doWork(): Result {
+        val source = inputData.getString(KEY_SOURCE) ?: "unknown"
+        Log.d(TAG, "▶ doWork() START – source=$source, runAttemptCount=$runAttemptCount")
+
         val settings = SettingsStore(applicationContext).settingsFlow.first()
 
         val inTimeWindow = TimeWindowChecker.isAllowedNow(
@@ -43,17 +48,25 @@ class WaterReminderWorker(
             timeProvider     = timeProvider
         )
         if (!inTimeWindow) {
+            Log.d(TAG, "⏭ Außerhalb Zeitfenster → skip (hour=${timeProvider.currentHour()})")
             rescheduleIfNeeded()
             return Result.success()
         }
 
         val intakeStore = IntakeStore(applicationContext, timeProvider)
-        if (!intakeStore.hasReachedGoal(settings.goalMl)) {
-            val allowSnooze = inputData.getString(KEY_SOURCE) != SOURCE_SNOOZE
-            notificationSender.sendReminder(System.currentTimeMillis(), allowSnooze)
+        val goalReached = intakeStore.hasReachedGoal(settings.goalMl)
+        Log.d(TAG, "📊 goalReached=$goalReached (goal=${settings.goalMl} ml)")
+
+        if (!goalReached) {
+            val allowSnooze = source != SOURCE_SNOOZE
+            val sent = notificationSender.sendReminder(System.currentTimeMillis(), allowSnooze)
+            Log.d(TAG, "🔔 Notification gesendet=$sent, allowSnooze=$allowSnooze")
+        } else {
+            Log.d(TAG, "🎯 Goal bereits erreicht → kein Reminder")
         }
 
         rescheduleIfNeeded()
+        Log.d(TAG, "✅ doWork() ENDE")
         return Result.success()
     }
 
@@ -64,8 +77,12 @@ class WaterReminderWorker(
      */
     private fun rescheduleIfNeeded() {
         val intervalMinutes = inputData.getLong(KEY_INTERVAL_MINUTES, -1L)
-        if (intervalMinutes < 1L) return   // PeriodicWorkRequest-Modus → nichts tun
+        if (intervalMinutes < 1L) {
+            Log.d(TAG, "🔄 Periodic-Modus → kein manuelles Reschedule nötig")
+            return
+        }
 
+        Log.d(TAG, "🔄 OneTime-Modus → Reschedule in $intervalMinutes min")
         val next = OneTimeWorkRequestBuilder<WaterReminderWorker>()
             .setInitialDelay(intervalMinutes, TimeUnit.MINUTES)
             .setInputData(workDataOf(
