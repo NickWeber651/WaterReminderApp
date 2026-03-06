@@ -318,16 +318,17 @@ internal fun WaterDrop(
         val dropPath = buildDropPath(w, h)
 
         clipPath(dropPath) {
-            // Dunkler Tropfen-Hintergrund
-            drawPath(path = dropPath, color = DropBackground)
+            // Hintergrund: bei fast vollem Tropfen direkt Wasserfarbe,
+            // sonst dunkler Hintergrund – verhindert sichtbare dunkle Lücken
+            val bgColor = if (animatedFill >= 0.97f) WaterBottom else DropBackground
+            drawPath(path = dropPath, color = bgColor)
 
-            // Welle-Amplitude (muss mit buildWavePath-Aufrufen übereinstimmen)
-            val maxAmplitude = h * 0.028f
-            // waterTopY um eine Amplitude nach oben verschieben, damit bei
-            // hohem Füllstand die Welle den Tropfen vollständig ausfüllt.
+            // waterTopY: um 3× die Amplitude nach oben verschieben, damit
+            // auch bei hohem Füllstand die Welle den Tropfen vollständig bedeckt.
             // Bei 0 % kein Offset, damit kein Wasser-Streifen sichtbar ist.
-            val amplitudeOffset = if (animatedFill > 0f) maxAmplitude else 0f
-            val waterTopY = h * (1f - animatedFill) - amplitudeOffset
+            val maxAmplitude    = h * 0.028f
+            val amplitudeOffset = if (animatedFill > 0f) maxAmplitude * 3f else 0f
+            val waterTopY       = h * (1f - animatedFill) - amplitudeOffset
 
             // Welle 1 – helle Vorderwelle
             drawPath(
@@ -423,18 +424,23 @@ private fun buildWavePath(
     frequency: Float,
     phaseShift: Float
 ): Path = Path().apply {
-    val steps = 80   // mehr Schritte = glattere Kurve
+    val steps = 80
+
+    // Starte unten-links, gehe hoch zur Wellenlinie
     moveTo(0f, h)
     lineTo(0f, waterTopY)
 
+    // Zeichne die Sinuswelle von links nach rechts
+    // WICHTIG: kein moveTo im Loop – sonst reißt der Pfad ab
     for (i in 0..steps) {
         val x = w * i / steps
         val y = waterTopY + amplitude * sin(
             frequency * 2f * PI.toFloat() * (i.toFloat() / steps) + phaseShift
         )
-        if (i == 0) moveTo(x, y) else lineTo(x, y)
+        lineTo(x, y)
     }
 
+    // Schließe den Pfad: rechts runter zur Unterkante, dann zurück
     lineTo(w, h)
     close()
 }
