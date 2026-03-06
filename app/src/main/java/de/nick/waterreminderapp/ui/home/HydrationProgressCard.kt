@@ -173,26 +173,23 @@ private fun HydrationRing(
     progress: Float,
     modifier: Modifier = Modifier
 ) {
-    // ── Einblendeanimation: federndes Easing wie beim Tropfen ──────────────
+    // Fortschritt baut sich smooth auf
     val animatedProgress by animateFloatAsState(
         targetValue   = progress,
         animationSpec = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
         label         = "ringProgress"
     )
 
-    // ── Kontinuierliche Animationen ───────────────────────────────────────
+    // Glow-Bogen pulsiert im gleichen Rhythmus wie die Tropfenwellen (2400 ms)
     val infiniteTransition = rememberInfiniteTransition(label = "ringInfinite")
-
-
-    // Dot-Puls: sanftes Atmen des leuchtenden Endpunkts
-    val dotPulse by infiniteTransition.animateFloat(
-        initialValue  = 0.6f,
+    val glowPulse by infiniteTransition.animateFloat(
+        initialValue  = 0.0f,
         targetValue   = 1.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+            animation  = tween(durationMillis = 2400, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "dotPulse"
+        label = "glowPulse"
     )
 
     Canvas(modifier = modifier) {
@@ -202,24 +199,6 @@ private fun HydrationRing(
         val arcRect  = Rect(
             offset = Offset(inset, inset),
             size   = Size(size.width - glowPx, size.height - glowPx)
-        )
-        val cx = size.width  / 2f
-        val cy = size.height / 2f
-        val r  = arcRect.width / 2f
-
-        // ---- Halo / Glüh-Track ----
-        drawArc(
-            brush      = Brush.sweepGradient(
-                0.0f to RingGlow.copy(alpha = 0.0f),
-                0.5f to RingGlow.copy(alpha = 0.06f),
-                1.0f to RingGlow.copy(alpha = 0.0f)
-            ),
-            startAngle = GAUGE_START_ANGLE,
-            sweepAngle = GAUGE_SWEEP,
-            useCenter  = false,
-            topLeft    = arcRect.topLeft,
-            size       = arcRect.size,
-            style      = Stroke(width = glowPx, cap = StrokeCap.Round)
         )
 
         // ---- Track (Hintergrundring) ----
@@ -236,7 +215,21 @@ private fun HydrationRing(
         if (animatedProgress > 0f) {
             val sweepAngle = GAUGE_SWEEP * animatedProgress
 
-            // ---- Fortschritts-Bogen mit Gradient ----
+            // ---- Pulsierender Glow-Bogen hinter dem Fortschritt ----
+            // Breite und Alpha atmen sanft – wie die Wellen im Tropfen
+            val glowAlpha  = 0.10f + 0.15f * glowPulse   // 0.10 … 0.25
+            val glowWidth  = glowPx * (0.6f + 0.4f * glowPulse)  // 60 … 100 % der Glow-Breite
+            drawArc(
+                color      = RingProgressStart.copy(alpha = glowAlpha),
+                startAngle = GAUGE_START_ANGLE,
+                sweepAngle = sweepAngle,
+                useCenter  = false,
+                topLeft    = arcRect.topLeft,
+                size       = arcRect.size,
+                style      = Stroke(width = glowWidth, cap = StrokeCap.Round)
+            )
+
+            // ---- Fortschritts-Bogen (scharf, klar) ----
             drawArc(
                 brush      = Brush.sweepGradient(
                     0.0f  to RingProgressStart,
@@ -250,38 +243,7 @@ private fun HydrationRing(
                 size       = arcRect.size,
                 style      = Stroke(width = strokePx, cap = StrokeCap.Round)
             )
-
-
-            // ---- Leuchtender Dot am Fortschritts-Ende (pulsierend) ----
-            val endAngleRad = Math.toRadians(
-                (GAUGE_START_ANGLE + sweepAngle).toDouble()
-            ).toFloat()
-            val dotX = cx + r * cos(endAngleRad)
-            val dotY = cy + r * sin(endAngleRad)
-
-            // Pulsierender äußerer Glow
-            drawCircle(
-                color  = RingProgressStart.copy(alpha = 0.35f * dotPulse),
-                radius = strokePx * (0.7f + 0.4f * dotPulse),
-                center = Offset(dotX, dotY)
-            )
-            // Stabiler innerer Kern
-            drawCircle(
-                color  = Color.White.copy(alpha = 0.85f),
-                radius = strokePx * 0.28f,
-                center = Offset(dotX, dotY)
-            )
         }
-
-        // ---- Dot am Start-Ende (Anker, immer sichtbar) ----
-        val startAngleRad = Math.toRadians(GAUGE_START_ANGLE.toDouble()).toFloat()
-        val sx = cx + r * cos(startAngleRad)
-        val sy = cy + r * sin(startAngleRad)
-        drawCircle(
-            color  = RingTrackColor,
-            radius = strokePx * 0.38f,
-            center = Offset(sx, sy)
-        )
     }
 }
 
