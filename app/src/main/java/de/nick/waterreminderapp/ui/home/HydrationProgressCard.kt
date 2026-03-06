@@ -2,6 +2,7 @@ package de.nick.waterreminderapp.ui.home
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -172,22 +173,50 @@ private fun HydrationRing(
     progress: Float,
     modifier: Modifier = Modifier
 ) {
+    // ── Einblendeanimation: federndes Easing wie beim Tropfen ──────────────
     val animatedProgress by animateFloatAsState(
         targetValue   = progress,
-        animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
         label         = "ringProgress"
     )
 
+    // ── Kontinuierliche Animationen (wie die Wellen im Tropfen) ───────────
+    val infiniteTransition = rememberInfiniteTransition(label = "ringInfinite")
+
+    // Shimmer-Licht läuft einmal pro 2,4 s den Bogen entlang (0→1)
+    val shimmerPos by infiniteTransition.animateFloat(
+        initialValue  = 0f,
+        targetValue   = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2400, easing = LinearEasing)
+        ),
+        label = "shimmerPos"
+    )
+
+    // Dot-Puls: sanftes Atmen des leuchtenden Endpunkts
+    val dotPulse by infiniteTransition.animateFloat(
+        initialValue  = 0.6f,
+        targetValue   = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dotPulse"
+    )
+
     Canvas(modifier = modifier) {
-        val strokePx     = RING_STROKE.toPx()
-        val glowPx       = RING_GLOW_STROKE.toPx()
-        val inset        = glowPx / 2f   // Inset nach dem größten Stroke richten
-        val arcRect      = Rect(
+        val strokePx = RING_STROKE.toPx()
+        val glowPx   = RING_GLOW_STROKE.toPx()
+        val inset    = glowPx / 2f
+        val arcRect  = Rect(
             offset = Offset(inset, inset),
             size   = Size(size.width - glowPx, size.height - glowPx)
         )
+        val cx = size.width  / 2f
+        val cy = size.height / 2f
+        val r  = arcRect.width / 2f
 
-        // ---- Halo / Glüh-Track (sehr soft, transparent) ----
+        // ---- Halo / Glüh-Track ----
         drawArc(
             brush      = Brush.sweepGradient(
                 0.0f to RingGlow.copy(alpha = 0.0f),
@@ -213,8 +242,10 @@ private fun HydrationRing(
             style      = Stroke(width = strokePx, cap = StrokeCap.Round)
         )
 
-        // ---- Fortschritts-Bogen mit Gradient ----
         if (animatedProgress > 0f) {
+            val sweepAngle = GAUGE_SWEEP * animatedProgress
+
+            // ---- Fortschritts-Bogen mit Gradient ----
             drawArc(
                 brush      = Brush.sweepGradient(
                     0.0f  to RingProgressStart,
@@ -222,30 +253,49 @@ private fun HydrationRing(
                     1.0f  to RingProgressEnd
                 ),
                 startAngle = GAUGE_START_ANGLE,
-                sweepAngle = GAUGE_SWEEP * animatedProgress,
+                sweepAngle = sweepAngle,
                 useCenter  = false,
                 topLeft    = arcRect.topLeft,
                 size       = arcRect.size,
                 style      = Stroke(width = strokePx, cap = StrokeCap.Round)
             )
 
-            // ---- Leuchtender Dot am Fortschritts-Ende ----
-            val endAngleRad = Math.toRadians(
-                (GAUGE_START_ANGLE + GAUGE_SWEEP * animatedProgress).toDouble()
-            ).toFloat()
-            val cx    = size.width  / 2f
-            val cy    = size.height / 2f
-            val r     = arcRect.width / 2f
-            val dotX  = cx + r * cos(endAngleRad)
-            val dotY  = cy + r * sin(endAngleRad)
+            // ---- Shimmer-Licht: heller Fleck läuft den Bogen entlang ----
+            // Nur sichtbar wenn genug Bogen vorhanden (> 5 %)
+            if (animatedProgress > 0.05f) {
+                val shimmerAngle = GAUGE_START_ANGLE + sweepAngle * shimmerPos
+                val shimmerRad   = Math.toRadians(shimmerAngle.toDouble()).toFloat()
+                val shimmerX     = cx + r * cos(shimmerRad)
+                val shimmerY     = cy + r * sin(shimmerRad)
 
-            // Äußeres Leuchten
+                // Äußerer weicher Halo
+                drawCircle(
+                    color  = Color.White.copy(alpha = 0.18f),
+                    radius = strokePx * 1.1f,
+                    center = Offset(shimmerX, shimmerY)
+                )
+                // Heller Kern
+                drawCircle(
+                    color  = Color.White.copy(alpha = 0.55f),
+                    radius = strokePx * 0.4f,
+                    center = Offset(shimmerX, shimmerY)
+                )
+            }
+
+            // ---- Leuchtender Dot am Fortschritts-Ende (pulsierend) ----
+            val endAngleRad = Math.toRadians(
+                (GAUGE_START_ANGLE + sweepAngle).toDouble()
+            ).toFloat()
+            val dotX = cx + r * cos(endAngleRad)
+            val dotY = cy + r * sin(endAngleRad)
+
+            // Pulsierender äußerer Glow
             drawCircle(
-                color  = RingProgressStart.copy(alpha = 0.35f),
-                radius = strokePx * 0.9f,
+                color  = RingProgressStart.copy(alpha = 0.35f * dotPulse),
+                radius = strokePx * (0.7f + 0.4f * dotPulse),
                 center = Offset(dotX, dotY)
             )
-            // Innerer heller Kern
+            // Stabiler innerer Kern
             drawCircle(
                 color  = Color.White.copy(alpha = 0.85f),
                 radius = strokePx * 0.28f,
@@ -253,13 +303,10 @@ private fun HydrationRing(
             )
         }
 
-        // ---- Dot am Start-Ende (immer sichtbar als Anker) ----
+        // ---- Dot am Start-Ende (Anker, immer sichtbar) ----
         val startAngleRad = Math.toRadians(GAUGE_START_ANGLE.toDouble()).toFloat()
-        val cx   = size.width  / 2f
-        val cy   = size.height / 2f
-        val r    = arcRect.width / 2f
-        val sx   = cx + r * cos(startAngleRad)
-        val sy   = cy + r * sin(startAngleRad)
+        val sx = cx + r * cos(startAngleRad)
+        val sy = cy + r * sin(startAngleRad)
         drawCircle(
             color  = RingTrackColor,
             radius = strokePx * 0.38f,
