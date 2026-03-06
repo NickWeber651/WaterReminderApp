@@ -390,17 +390,17 @@ internal fun WaterDrop(
             style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
         )
 
-        // Glanz-Highlight (oben links im Tropfenkopf)
+        // Glanz-Highlight oben-links im runden Teil des Tropfens
         drawCircle(
-            color  = Color.White.copy(alpha = 0.15f),
-            radius = w * 0.065f,
-            center = Offset(w * 0.37f, h * 0.18f)
+            color  = Color.White.copy(alpha = 0.18f),
+            radius = w * 0.070f,
+            center = Offset(w * 0.36f, h * 0.14f)
         )
-        // Zweiter, kleinerer Glanzpunkt – wirkt wie Glasreflex
+        // Zweiter, kleinerer Glanzpunkt – subtiler Glasreflex
         drawCircle(
-            color  = Color.White.copy(alpha = 0.08f),
-            radius = w * 0.035f,
-            center = Offset(w * 0.33f, h * 0.26f)
+            color  = Color.White.copy(alpha = 0.09f),
+            radius = w * 0.038f,
+            center = Offset(w * 0.30f, h * 0.23f)
         )
     }
 }
@@ -472,74 +472,72 @@ private fun DrawScope.drawBubbles(
 }
 
 // ---------------------------------------------------------------------------
-// Tropfen-Path – natürliche, weiche Wassertropfen-Silhouette
+// Tropfen-Path – klassische Wassertropfen-Silhouette (Spitze unten)
 // ---------------------------------------------------------------------------
 
 /**
- * Erzeugt einen stilisierten Wassertropfen via kubischer Bézier-Kurven.
- *
- * Neue Silhouette:
- *  - streng symmetrisch um die Vertikalachse
- *  - oben weich gerundet, volle Schulter
- *  - sanft bauchig im Mittelteil, kompakte Proportion
- *  - kurze, weiche Spitze ohne harte V-Form
+ * Erzeugt eine klassische Wassertropfen-Silhouette:
+ *  - Spitze zeigt nach unten (wie ein echter fallender Tropfen)
+ *  - Oberseite: breite, gleichmäßige Halbkreis-Wölbung
+ *  - Untere Flanken: fließend und symmetrisch in eine weiche Spitze laufend
+ *  - Streng symmetrisch, nur 2 kubische Segmente pro Seite
+ *  - Proportionen: Breite ≈ 65 % der Höhe → klassisches, harmonisches Verhältnis
  */
 private fun buildDropPath(w: Float, h: Float): Path = Path().apply {
     val cx = w / 2f
 
-    // Vertikale Leitpunkte für eine kompakte, symmetrische Silhouette
-    val capY      = h * 0.10f
-    val shoulderY = h * 0.26f
-    val bellyY    = h * 0.56f
-    val waistY    = h * 0.80f
-    val tipY      = h * 0.96f
+    // Der obere Halbkreis: Mittelpunkt und Radius
+    // Der Kreis nimmt die oberen ~55 % der Höhe ein.
+    val circleRadius  = w * 0.46f      // knapp unter Halbbreite → kompakter Kreis
+    val circleCenterY = h * 0.38f      // Kreismitte sitzt im oberen Bereich
 
-    // Halbbreiten an den Leitpunkten
-    val rCap      = w * 0.18f
-    val rShoulder = w * 0.37f
-    val rBelly    = w * 0.47f
-    val rWaist    = w * 0.23f
-    val rTip      = w * 0.045f
+    // Die Spitze sitzt ganz unten
+    val tipY = h * 0.965f
 
-    data class Cubic(val c1: Offset, val c2: Offset, val end: Offset)
-    fun Offset.mirrorX(centerX: Float) = Offset(2f * centerX - x, y)
-    fun mirror(segment: Cubic) = Cubic(
-        c1  = segment.c1.mirrorX(cx),
-        c2  = segment.c2.mirrorX(cx),
-        end = segment.end.mirrorX(cx)
+    // Schultern: links und rechts auf Höhe des Kreismittelpunkts
+    val shoulderX = circleRadius
+    val shoulderY = circleCenterY
+
+    // Bézier-Kontrollpunkte für die Flanken (Schulter → Spitze):
+    // cp1 hält die Breite noch aufrecht (bauchige Mitte), cp2 zieht zur Mitte ein
+    val cp1X = w * 0.47f
+    val cp1Y = h * 0.66f
+    val cp2X = w * 0.18f
+    val cp2Y = h * 0.89f
+
+    // Linke Schulter als Startpunkt
+    moveTo(cx - shoulderX, shoulderY)
+
+    // Linke Flanke → Spitze (unten)
+    cubicTo(
+        cx - cp1X, cp1Y,
+        cx - cp2X, cp2Y,
+        cx,        tipY
     )
 
-    val right = listOf(
-        // Scheitel → Schulter: runde Kappe mit breiter Schulter
-        Cubic(
-            Offset(cx + rCap, capY),
-            Offset(cx + rShoulder * 1.06f, capY + (shoulderY - capY) * 0.34f),
-            Offset(cx + rShoulder, shoulderY)
-        ),
-        // Schulter → Bauch: weicher Übergang in die breiteste Zone
-        Cubic(
-            Offset(cx + rShoulder * 1.08f, shoulderY + (bellyY - shoulderY) * 0.18f),
-            Offset(cx + rBelly * 1.02f, shoulderY + (bellyY - shoulderY) * 0.84f),
-            Offset(cx + rBelly, bellyY)
-        ),
-        // Bauch → Taille: sanftes Einziehen Richtung Spitze
-        Cubic(
-            Offset(cx + rBelly * 0.98f, bellyY + (waistY - bellyY) * 0.32f),
-            Offset(cx + rWaist * 1.18f, waistY - (waistY - bellyY) * 0.14f),
-            Offset(cx + rWaist, waistY)
-        ),
-        // Taille → Spitze: kompakter, klarer Abschluss ohne harte V-Form
-        Cubic(
-            Offset(cx + rWaist * 0.82f, waistY + (tipY - waistY) * 0.26f),
-            Offset(cx + rTip * 1.70f, tipY - (tipY - waistY) * 0.08f),
-            Offset(cx, tipY)
-        )
+    // Rechte Flanke ← Spitze (nach oben)
+    cubicTo(
+        cx + cp2X, cp2Y,
+        cx + cp1X, cp1Y,
+        cx + shoulderX, shoulderY
     )
 
-    moveTo(cx, capY)
-    right.forEach { s -> cubicTo(s.c1.x, s.c1.y, s.c2.x, s.c2.y, s.end.x, s.end.y) }
-    right.asReversed().map(::mirror)
-        .forEach { s -> cubicTo(s.c1.x, s.c1.y, s.c2.x, s.c2.y, s.end.x, s.end.y) }
+    // Oberen Halbkreis in 2 kubischen Segmenten approximieren
+    // Bézier-Kreis-Approximation: k ≈ 0.5523 * Radius
+    val k = circleRadius * 0.5523f
+
+    // Rechte Schulter → Scheitelpunkt (oben Mitte)
+    cubicTo(
+        cx + circleRadius, circleCenterY - k,
+        cx + k,            circleCenterY - circleRadius,
+        cx,                circleCenterY - circleRadius
+    )
+    // Scheitelpunkt → Linke Schulter
+    cubicTo(
+        cx - k,            circleCenterY - circleRadius,
+        cx - circleRadius, circleCenterY - k,
+        cx - shoulderX,    shoulderY
+    )
 
     close()
 }
