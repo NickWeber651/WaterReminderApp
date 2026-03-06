@@ -1,6 +1,7 @@
 package de.nick.waterreminderapp.scheduler
 
 import android.content.Context
+import android.util.Log
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -12,6 +13,7 @@ import java.util.concurrent.TimeUnit
 
 object ReminderScheduler {
 
+    private const val TAG = "ReminderScheduler"
     private const val WORK_NAME_PERIODIC = "water_reminder_periodic"
 
     /**
@@ -25,6 +27,7 @@ object ReminderScheduler {
      */
     fun start(context: Context, intervalMinutes: Long = 60) {
         val wm = WorkManager.getInstance(context)
+        Log.d(TAG, "▶ start() – intervalMinutes=$intervalMinutes")
 
         if (intervalMinutes >= 15) {
             // Periodisch-Modus: altes OneTime-Work stoppen falls vorhanden
@@ -40,6 +43,7 @@ object ReminderScheduler {
             wm.enqueueUniquePeriodicWork(
                 WORK_NAME_PERIODIC, ExistingPeriodicWorkPolicy.UPDATE, request
             )
+            Log.d(TAG, "📋 PeriodicWork enqueued (UPDATE) – interval=${intervalMinutes}min")
         } else {
             // OneTime-Modus: altes Periodic-Work stoppen falls vorhanden
             wm.cancelUniqueWork(WORK_NAME_PERIODIC)
@@ -55,10 +59,12 @@ object ReminderScheduler {
             wm.enqueueUniqueWork(
                 WaterReminderWorker.WORK_NAME_ONE_TIME, ExistingWorkPolicy.REPLACE, request
             )
+            Log.d(TAG, "📋 OneTimeWork enqueued (REPLACE) – delay=${intervalMinutes}min")
         }
     }
 
     fun stop(context: Context) {
+        Log.d(TAG, "⏹ stop()")
         val wm = WorkManager.getInstance(context)
         wm.cancelUniqueWork(WORK_NAME_PERIODIC)
         wm.cancelUniqueWork(WaterReminderWorker.WORK_NAME_ONE_TIME)
