@@ -52,8 +52,8 @@ private val RingTrackColor    = Color(0xFF1E2E40)
 private val RingProgressStart = Color(0xFF00D4FF)   // kräftigeres Aqua
 private val RingProgressEnd   = Color(0xFF0088CC)
 private val RingGlow          = Color(0xFF00AADD)   // für den Innen-Glüheffekt
-private val DropBackground    = Color(0xFF162233)
-private val DropOutline       = Color(0xFF00B4D8)
+private val DropBackground    = Color(0xFF152030)
+private val DropOutline       = Color(0xFF2A7A9A)   // subtil, gedämpft, nicht neon
 private val WaterTop          = Color(0xFF4DD8EE)
 private val WaterBottom       = Color(0xFF0096C7)
 private val TextPrimary       = Color(0xFFEAF6FF)
@@ -329,8 +329,8 @@ internal fun WaterDrop(
                     w          = w,
                     h          = h,
                     waterTopY  = waterTopY,
-                    amplitude  = h * 0.042f,
-                    frequency  = 1.5f,
+                    amplitude  = h * 0.028f,
+                    frequency  = 1.3f,
                     phaseShift = wavePhase
                 ),
                 brush = Brush.verticalGradient(
@@ -345,9 +345,9 @@ internal fun WaterDrop(
                 path  = buildWavePath(
                     w          = w,
                     h          = h,
-                    waterTopY  = waterTopY + h * 0.028f,
-                    amplitude  = h * 0.032f,
-                    frequency  = 1.2f,
+                    waterTopY  = waterTopY + h * 0.022f,
+                    amplitude  = h * 0.020f,
+                    frequency  = 1.1f,
                     phaseShift = wavePhase2
                 ),
                 brush = Brush.verticalGradient(
@@ -376,25 +376,31 @@ internal fun WaterDrop(
             }
         }
 
-        // Tropfen-Umriss – leicht breiter für bessere Sichtbarkeit
+        // Tropfen-Umriss – sauber und subtil
         drawPath(
             path  = dropPath,
             color = DropOutline,
-            style = Stroke(width = 2.8.dp.toPx(), cap = StrokeCap.Round)
+            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
         )
 
-        // Äußeres Leuchten um den Tropfen
+        // Sanfter äußerer Glow – sehr dezent
         drawPath(
             path  = dropPath,
-            color = DropOutline.copy(alpha = 0.12f),
-            style = Stroke(width = 7.dp.toPx(), cap = StrokeCap.Round)
+            color = DropOutline.copy(alpha = 0.08f),
+            style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
         )
 
-        // Glanz-Highlight
+        // Glanz-Highlight (oben links im Tropfenkopf)
         drawCircle(
-            color  = Color.White.copy(alpha = 0.20f),
-            radius = w * 0.08f,
-            center = Offset(w * 0.34f, h * 0.27f)
+            color  = Color.White.copy(alpha = 0.15f),
+            radius = w * 0.065f,
+            center = Offset(w * 0.37f, h * 0.18f)
+        )
+        // Zweiter, kleinerer Glanzpunkt – wirkt wie Glasreflex
+        drawCircle(
+            color  = Color.White.copy(alpha = 0.08f),
+            radius = w * 0.035f,
+            center = Offset(w * 0.33f, h * 0.26f)
         )
     }
 }
@@ -466,33 +472,74 @@ private fun DrawScope.drawBubbles(
 }
 
 // ---------------------------------------------------------------------------
-// Tropfen-Path
+// Tropfen-Path – natürliche, weiche Wassertropfen-Silhouette
 // ---------------------------------------------------------------------------
 
+/**
+ * Erzeugt einen stilisierten Wassertropfen via kubischer Bézier-Kurven.
+ *
+ * Neue Silhouette:
+ *  - streng symmetrisch um die Vertikalachse
+ *  - oben weich gerundet, volle Schulter
+ *  - sanft bauchig im Mittelteil, kompakte Proportion
+ *  - kurze, weiche Spitze ohne harte V-Form
+ */
 private fun buildDropPath(w: Float, h: Float): Path = Path().apply {
-    val cx       = w / 2f
-    val circleR  = w * 0.42f
-    val circleCy = h * 0.38f
-    val tipY     = h * 0.97f
+    val cx = w / 2f
 
-    moveTo(cx - circleR * 0.85f, circleCy + circleR * 0.5f)
+    // Vertikale Leitpunkte für eine kompakte, symmetrische Silhouette
+    val capY      = h * 0.10f
+    val shoulderY = h * 0.26f
+    val bellyY    = h * 0.56f
+    val waistY    = h * 0.80f
+    val tipY      = h * 0.96f
 
-    cubicTo(
-        cx - circleR * 0.9f, circleCy + circleR * 0.9f,
-        cx - circleR * 0.3f, tipY - h * 0.08f,
-        cx, tipY
+    // Halbbreiten an den Leitpunkten
+    val rCap      = w * 0.18f
+    val rShoulder = w * 0.37f
+    val rBelly    = w * 0.47f
+    val rWaist    = w * 0.23f
+    val rTip      = w * 0.045f
+
+    data class Cubic(val c1: Offset, val c2: Offset, val end: Offset)
+    fun Offset.mirrorX(centerX: Float) = Offset(2f * centerX - x, y)
+    fun mirror(segment: Cubic) = Cubic(
+        c1  = segment.c1.mirrorX(cx),
+        c2  = segment.c2.mirrorX(cx),
+        end = segment.end.mirrorX(cx)
     )
-    cubicTo(
-        cx + circleR * 0.3f, tipY - h * 0.08f,
-        cx + circleR * 0.9f, circleCy + circleR * 0.9f,
-        cx + circleR * 0.85f, circleCy + circleR * 0.5f
+
+    val right = listOf(
+        // Scheitel → Schulter: runde Kappe mit breiter Schulter
+        Cubic(
+            Offset(cx + rCap, capY),
+            Offset(cx + rShoulder * 1.06f, capY + (shoulderY - capY) * 0.34f),
+            Offset(cx + rShoulder, shoulderY)
+        ),
+        // Schulter → Bauch: weicher Übergang in die breiteste Zone
+        Cubic(
+            Offset(cx + rShoulder * 1.08f, shoulderY + (bellyY - shoulderY) * 0.18f),
+            Offset(cx + rBelly * 1.02f, shoulderY + (bellyY - shoulderY) * 0.84f),
+            Offset(cx + rBelly, bellyY)
+        ),
+        // Bauch → Taille: sanftes Einziehen Richtung Spitze
+        Cubic(
+            Offset(cx + rBelly * 0.98f, bellyY + (waistY - bellyY) * 0.32f),
+            Offset(cx + rWaist * 1.18f, waistY - (waistY - bellyY) * 0.14f),
+            Offset(cx + rWaist, waistY)
+        ),
+        // Taille → Spitze: kompakter, klarer Abschluss ohne harte V-Form
+        Cubic(
+            Offset(cx + rWaist * 0.82f, waistY + (tipY - waistY) * 0.26f),
+            Offset(cx + rTip * 1.70f, tipY - (tipY - waistY) * 0.08f),
+            Offset(cx, tipY)
+        )
     )
-    arcTo(
-        rect              = Rect(center = Offset(cx, circleCy), radius = circleR),
-        startAngleDegrees = 30f,
-        sweepAngleDegrees = -240f,
-        forceMoveTo       = false
-    )
+
+    moveTo(cx, capY)
+    right.forEach { s -> cubicTo(s.c1.x, s.c1.y, s.c2.x, s.c2.y, s.end.x, s.end.y) }
+    right.asReversed().map(::mirror)
+        .forEach { s -> cubicTo(s.c1.x, s.c1.y, s.c2.x, s.c2.y, s.end.x, s.end.y) }
 
     close()
 }
