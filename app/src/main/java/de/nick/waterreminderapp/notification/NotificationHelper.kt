@@ -55,12 +55,18 @@ class NotificationHelper(private val context: Context) {
         ensureChannel()
         if (!hasPermission()) return false
 
+        // Alte Reminder-Notification zuerst entfernen, damit die neue
+        // garantiert als frische Notification mit Sound/Heads-Up erscheint.
+        NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID_REMINDER)
+
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
             .setContentTitle("Zeit für Wasser 💧")
             .setContentText("Trink jetzt ein Glas Wasser!")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
+            .setWhen(System.currentTimeMillis())
+            .setShowWhen(true)
             .addAction(android.R.drawable.ic_menu_add, "250 ml getrunken",
                 buildActionIntent(WaterActionReceiver.ACTION_DRANK_250, reminderId, REQUEST_DRANK))
 
