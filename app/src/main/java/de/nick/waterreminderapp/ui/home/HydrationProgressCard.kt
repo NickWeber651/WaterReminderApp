@@ -2,7 +2,6 @@ package de.nick.waterreminderapp.ui.home
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -165,7 +164,7 @@ private fun HydrationGauge(
 }
 
 // ---------------------------------------------------------------------------
-// Halbkreisförmiger Fortschrittsring (Gauge, 240°)
+// Halbkreisförmiger Fortschrittsring – Welle läuft entlang des Bogens
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -180,16 +179,23 @@ private fun HydrationRing(
         label         = "ringProgress"
     )
 
-    // Glow-Bogen pulsiert im gleichen Rhythmus wie die Tropfenwellen (2400 ms)
-    val infiniteTransition = rememberInfiniteTransition(label = "ringInfinite")
-    val glowPulse by infiniteTransition.animateFloat(
-        initialValue  = 0.0f,
-        targetValue   = 1.0f,
+    // Zwei Wellenphasen – gleicher Takt wie Tropfen (2400 / 3200 ms)
+    val infiniteTransition = rememberInfiniteTransition(label = "ringWave")
+    val wavePhase1 by infiniteTransition.animateFloat(
+        initialValue  = 0f,
+        targetValue   = (2f * PI).toFloat(),
         animationSpec = infiniteRepeatable(
-            animation  = tween(durationMillis = 2400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
+            animation = tween(durationMillis = 2400, easing = LinearEasing)
         ),
-        label = "glowPulse"
+        label = "ringWave1"
+    )
+    val wavePhase2 by infiniteTransition.animateFloat(
+        initialValue  = PI.toFloat(),
+        targetValue   = (3f * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 3200, easing = LinearEasing)
+        ),
+        label = "ringWave2"
     )
 
     Canvas(modifier = modifier) {
@@ -200,6 +206,9 @@ private fun HydrationRing(
             offset = Offset(inset, inset),
             size   = Size(size.width - glowPx, size.height - glowPx)
         )
+        val cx = size.width  / 2f
+        val cy = size.height / 2f
+        val r  = arcRect.width / 2f
 
         // ---- Track (Hintergrundring) ----
         drawArc(
@@ -213,35 +222,41 @@ private fun HydrationRing(
         )
 
         if (animatedProgress > 0f) {
-            val sweepAngle = GAUGE_SWEEP * animatedProgress
+            val sweepAngle  = GAUGE_SWEEP * animatedProgress
+            val amplitude   = strokePx * 0.30f   // Wellenamplitude: 30 % der Strichbreite
+            val steps       = 120                 // Punkte für glatte Kurve
 
-            // ---- Pulsierender Glow-Bogen hinter dem Fortschritt ----
-            // Breite und Alpha atmen sanft – wie die Wellen im Tropfen
-            val glowAlpha  = 0.10f + 0.15f * glowPulse   // 0.10 … 0.25
-            val glowWidth  = glowPx * (0.6f + 0.4f * glowPulse)  // 60 … 100 % der Glow-Breite
-            drawArc(
-                color      = RingProgressStart.copy(alpha = glowAlpha),
-                startAngle = GAUGE_START_ANGLE,
-                sweepAngle = sweepAngle,
-                useCenter  = false,
-                topLeft    = arcRect.topLeft,
-                size       = arcRect.size,
-                style      = Stroke(width = glowWidth, cap = StrokeCap.Round)
+            // Hilfsfunktion: Wellenpfad entlang des Bogens
+            // Die Welle schwingt radial (innen/außen), nicht tangential
+            fun buildArcWavePath(phase: Float): Path = Path().apply {
+                for (i in 0..steps) {
+                    val t         = i.toFloat() / steps
+                    val angleDeg  = GAUGE_START_ANGLE + sweepAngle * t
+                    val angleRad  = Math.toRadians(angleDeg.toDouble()).toFloat()
+                    val wave      = amplitude * sin(2f * PI.toFloat() * t * 3f + phase)
+                    val rWave     = r + wave
+                    val x         = cx + rWave * cos(angleRad)
+                    val y         = cy + rWave * sin(angleRad)
+                    if (i == 0) moveTo(x, y) else lineTo(x, y)
+                }
+            }
+
+            // ---- Welle 2: dunklere Hinterwelle (wie beim Tropfen) ----
+            drawPath(
+                path  = buildArcWavePath(wavePhase2),
+                color = RingProgressEnd.copy(alpha = 0.55f),
+                style = Stroke(width = strokePx * 0.65f, cap = StrokeCap.Round)
             )
 
-            // ---- Fortschritts-Bogen (scharf, klar) ----
-            drawArc(
-                brush      = Brush.sweepGradient(
+            // ---- Welle 1: helle Vorderwelle ----
+            drawPath(
+                path  = buildArcWavePath(wavePhase1),
+                brush = Brush.sweepGradient(
                     0.0f  to RingProgressStart,
                     0.65f to RingProgressEnd,
                     1.0f  to RingProgressEnd
                 ),
-                startAngle = GAUGE_START_ANGLE,
-                sweepAngle = sweepAngle,
-                useCenter  = false,
-                topLeft    = arcRect.topLeft,
-                size       = arcRect.size,
-                style      = Stroke(width = strokePx, cap = StrokeCap.Round)
+                style = Stroke(width = strokePx, cap = StrokeCap.Round)
             )
         }
     }
