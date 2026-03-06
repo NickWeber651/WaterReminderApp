@@ -164,7 +164,7 @@ private fun HydrationGauge(
 }
 
 // ---------------------------------------------------------------------------
-// Halbkreisförmiger Fortschrittsring – Welle läuft entlang des Bogens
+// Halbkreisförmiger Fortschrittsring – gefüllte Fläche mit Wellenkante
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -172,14 +172,13 @@ private fun HydrationRing(
     progress: Float,
     modifier: Modifier = Modifier
 ) {
-    // Fortschritt baut sich smooth auf
     val animatedProgress by animateFloatAsState(
         targetValue   = progress,
         animationSpec = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
         label         = "ringProgress"
     )
 
-    // Zwei Wellenphasen – gleicher Takt wie Tropfen (2400 / 3200 ms)
+    // Zwei Wellenphasen – gleicher Takt wie der Tropfen
     val infiniteTransition = rememberInfiniteTransition(label = "ringWave")
     val wavePhase1 by infiniteTransition.animateFloat(
         initialValue  = 0f,
@@ -199,16 +198,19 @@ private fun HydrationRing(
     )
 
     Canvas(modifier = modifier) {
-        val strokePx = RING_STROKE.toPx()
-        val glowPx   = RING_GLOW_STROKE.toPx()
-        val inset    = glowPx / 2f
-        val arcRect  = Rect(
+        val strokePx  = RING_STROKE.toPx()
+        val glowPx    = RING_GLOW_STROKE.toPx()
+        val inset     = glowPx / 2f
+        val arcRect   = Rect(
             offset = Offset(inset, inset),
             size   = Size(size.width - glowPx, size.height - glowPx)
         )
-        val cx = size.width  / 2f
-        val cy = size.height / 2f
-        val r  = arcRect.width / 2f
+        val cx    = size.width  / 2f
+        val cy    = size.height / 2f
+        val rMid  = arcRect.width / 2f          // Mittlerer Radius des Rings
+        val rInner = rMid - strokePx / 2f       // Innenkante
+        val rOuter = rMid + strokePx / 2f       // Außenkante
+        val steps = 180
 
         // ---- Track (Hintergrundring) ----
         drawArc(
@@ -223,40 +225,57 @@ private fun HydrationRing(
 
         if (animatedProgress > 0f) {
             val sweepAngle = GAUGE_SWEEP * animatedProgress
-            // Sehr kleine Amplitude: Linie bleibt sauber, Bewegung ist subtil
-            val amplitude  = 2.2f.dp.toPx()
-            val steps      = 160   // viele Punkte → glatte Kurve
+            // Amplitude: ~25 % der Strichbreite – klar sichtbar aber kein Schlangeneffekt
+            val amp = strokePx * 0.25f
 
-            // Wellenpfad: Sinus läuft radial (innen/außen) entlang des Bogens
-            fun buildArcWavePath(phase: Float, freq: Float): Path = Path().apply {
+            /**
+             * Baut einen gefüllten Ringabschnitt:
+             * - Außenkante: Radius rOuter + Sinuswelle
+             * - Innenkante: Radius rInner (glatt, kein Wellen)
+             * Vorwärts durch die Außenkante, rückwärts durch die Innenkante → geschlossene Fläche
+             */
+            fun buildFilledArcWave(phase: Float): Path = Path().apply {
+                // Vorwärts: Außenkante mit Welle
                 for (i in 0..steps) {
                     val t        = i.toFloat() / steps
                     val angleDeg = GAUGE_START_ANGLE + sweepAngle * t
                     val angleRad = Math.toRadians(angleDeg.toDouble()).toFloat()
-                    val wave     = amplitude * sin(2f * PI.toFloat() * t * freq + phase)
-                    val rWave    = r + wave
-                    val x        = cx + rWave * cos(angleRad)
-                    val y        = cy + rWave * sin(angleRad)
+                    val wave     = amp * sin(2f * PI.toFloat() * t * 4f + phase)
+                    val rw       = rOuter + wave
+                    val x        = cx + rw * cos(angleRad)
+                    val y        = cy + rw * sin(angleRad)
                     if (i == 0) moveTo(x, y) else lineTo(x, y)
                 }
+                // Rückwärts: Innenkante glatt
+                for (i in steps downTo 0) {
+                    val t        = i.toFloat() / steps
+                    val angleDeg = GAUGE_START_ANGLE + sweepAngle * t
+                    val angleRad = Math.toRadians(angleDeg.toDouble()).toFloat()
+                    val x        = cx + rInner * cos(angleRad)
+                    val y        = cy + rInner * sin(angleRad)
+                    lineTo(x, y)
+                }
+                close()
             }
 
-            // Hinterwelle: etwas dunkler, leicht versetzt
+            // Hinterwelle: dunkler, leicht versetzt (wie 2. Welle im Tropfen)
             drawPath(
-                path  = buildArcWavePath(wavePhase2, freq = 6f),
-                color = RingProgressEnd.copy(alpha = 0.60f),
-                style = Stroke(width = strokePx, cap = StrokeCap.Round)
+                path  = buildFilledArcWave(wavePhase2),
+                brush = Brush.sweepGradient(
+                    0.0f  to RingProgressEnd.copy(alpha = 0.7f),
+                    0.65f to RingProgressEnd.copy(alpha = 0.5f),
+                    1.0f  to RingProgressEnd.copy(alpha = 0.5f)
+                )
             )
 
-            // Vorderwelle: volle Helligkeit mit Gradient
+            // Vorderwelle: hell, kräftige Farben
             drawPath(
-                path  = buildArcWavePath(wavePhase1, freq = 6f),
+                path  = buildFilledArcWave(wavePhase1),
                 brush = Brush.sweepGradient(
-                    0.0f  to RingProgressStart,
-                    0.65f to RingProgressEnd,
-                    1.0f  to RingProgressEnd
-                ),
-                style = Stroke(width = strokePx, cap = StrokeCap.Round)
+                    0.0f  to RingProgressStart.copy(alpha = 0.92f),
+                    0.65f to RingProgressEnd.copy(alpha = 0.92f),
+                    1.0f  to RingProgressEnd.copy(alpha = 0.92f)
+                )
             )
         }
     }
