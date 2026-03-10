@@ -228,5 +228,47 @@ class SettingsViewModelTest {
 
         assertEquals(120L, scheduler.startCalls.first())
     }
+
+    // ── Erinnerungen-Toggle ──────────────────────────────────────────────────
+
+    @Test
+    fun toggleAktivierenStartetScheduler() = runTest {
+        val store     = FakeSettingsStore(Settings(intervalMinutes = 30))
+        val scheduler = FakeReminderScheduler()
+        val vm        = SettingsViewModel(store, scheduler)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onRemindersEnabledChange(true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.remindersEnabled)
+        assertTrue(store.remindersEnabledValue)
+        assertEquals(1, scheduler.startCalls.size)
+        assertEquals(30L, scheduler.startCalls.first())
+    }
+
+    @Test
+    fun toggleDeaktivierenStopptScheduler() = runTest {
+        val store     = FakeSettingsStore(remindersEnabled = true)
+        val scheduler = FakeReminderScheduler()
+        val vm        = SettingsViewModel(store, scheduler)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onRemindersEnabledChange(false)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.remindersEnabled)
+        assertFalse(store.remindersEnabledValue)
+        assertTrue(scheduler.stopCalled)
+    }
+
+    @Test
+    fun toggleLaedenRemindersEnabledAusStore() = runTest {
+        val store = FakeSettingsStore(remindersEnabled = true)
+        val vm    = SettingsViewModel(store)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.remindersEnabled)
+    }
 }
 
