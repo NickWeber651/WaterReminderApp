@@ -2,6 +2,20 @@
 
 Ein minimaler Wasser-Tracker für Android (API 26+), gebaut mit **Kotlin**, **Jetpack Compose** und **WorkManager**.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="Home-Screen" width="250" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/settings.png" alt="Einstellungen" width="250" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/icon.png" alt="App-Icon" width="250" />
+</p>
+
+| Home-Screen | Einstellungen | App-Icon |
+|:-:|:-:|:-:|
+| Fortschrittsanzeige mit Tropfen-Gauge und Bottom Sheet zum Hinzufügen | Tagesziel, Erinnerungsintervall und Zeitfenster konfigurieren | Blauer Wassertropfen als Adaptive Icon |
+
 ## Features
 
 - Tägliches Trinkziel mit Fortschrittsanzeige
