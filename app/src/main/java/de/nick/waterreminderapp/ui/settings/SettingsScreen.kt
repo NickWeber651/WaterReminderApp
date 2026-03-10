@@ -33,6 +33,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -286,6 +287,27 @@ fun SettingsScreen(
                 if (v.endHourError != null) {
                     Text(v.endHourError, color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            // ── 4. Erinnerungen an/aus ────────────────────────────────────
+            SettingsCard(
+                icon  = Icons.Filled.Notifications,
+                title = "Erinnerungen"
+            ) {
+                Row(
+                    modifier            = Modifier.fillMaxWidth(),
+                    verticalAlignment   = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text  = if (uiState.remindersEnabled) "Erinnerungen aktiv" else "Erinnerungen deaktiviert",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Switch(
+                        checked         = uiState.remindersEnabled,
+                        onCheckedChange = { vm.onRemindersEnabledChange(it) }
+                    )
                 }
             }
 

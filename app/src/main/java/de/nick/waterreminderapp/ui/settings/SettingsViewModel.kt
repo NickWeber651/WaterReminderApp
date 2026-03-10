@@ -22,6 +22,7 @@ data class SettingsUiState(
     val weekdayStartHourInput: String = "8",
     val weekendStartHourInput: String = "9",
     val endHourInput:          String = "23",
+    val remindersEnabled:      Boolean = false,
     val validationResult:      SettingsValidator.ValidationResult = SettingsValidator.ValidationResult(),
     val isLoading:             Boolean = true
 )
@@ -51,12 +52,14 @@ class SettingsViewModel(
         // Collector nach jedem save() die User-Eingaben überschreiben würde.
         viewModelScope.launch {
             val settings = settingsStore.settingsFlow.first()
+            val remindersOn = settingsStore.remindersEnabledFlow.first()
             _uiState.update { it.copy(
                 goalMlInput           = settings.goalMl.toString(),
                 intervalMinutesInput  = settings.intervalMinutes.toString(),
                 weekdayStartHourInput = settings.weekdayStartHour.toString(),
                 weekendStartHourInput = settings.weekendStartHour.toString(),
                 endHourInput          = settings.endHour.toString(),
+                remindersEnabled      = remindersOn,
                 isLoading             = false
             )}
         }
@@ -69,6 +72,20 @@ class SettingsViewModel(
     fun onWeekdayStartHourChange(v: String) { _uiState.update { it.copy(weekdayStartHourInput = v) } }
     fun onWeekendStartHourChange(v: String) { _uiState.update { it.copy(weekendStartHourInput = v) } }
     fun onEndHourChange(v: String)          { _uiState.update { it.copy(endHourInput = v) } }
+
+    /** Toggle für Erinnerungen – speichert sofort und startet/stoppt den Scheduler. */
+    fun onRemindersEnabledChange(enabled: Boolean) {
+        _uiState.update { it.copy(remindersEnabled = enabled) }
+        viewModelScope.launch {
+            settingsStore.setRemindersEnabled(enabled)
+            if (enabled) {
+                val intervalMinutes = settingsStore.settingsFlow.first().intervalMinutes.toLong()
+                scheduler?.start(intervalMinutes)
+            } else {
+                scheduler?.stop()
+            }
+        }
+    }
 
     // ── Speichern ────────────────────────────────────────────────────────────
 
