@@ -1,5 +1,9 @@
 package de.nick.waterreminderapp.ui.settings
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -41,6 +45,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -50,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.nick.waterreminderapp.data.SettingsStore
 import de.nick.waterreminderapp.scheduler.ContextReminderScheduler
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 // Voreingestellte Tagesziel-Optionen in ml
@@ -76,6 +82,19 @@ fun SettingsScreen(
     val uiState  by vm.uiState.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val v        = uiState.validationResult
+    val scope    = rememberCoroutineScope()
+
+    // Permission-Launcher für POST_NOTIFICATIONS (Android 13+)
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            vm.onRemindersEnabledChange(true)
+            scope.launch { snackbar.showSnackbar("Erinnerungen gestartet ✅") }
+        } else {
+            scope.launch { snackbar.showSnackbar("Benachrichtigungen nicht erlaubt ❌") }
+        }
+    }
 
     LaunchedEffect(Unit) {
         vm.events.collect { event ->
@@ -306,7 +325,20 @@ fun SettingsScreen(
                     )
                     Switch(
                         checked         = uiState.remindersEnabled,
-                        onCheckedChange = { vm.onRemindersEnabledChange(it) }
+                        onCheckedChange = { enabled ->
+                            if (enabled) {
+                                // Ab Android 13: Erst Permission anfragen
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    vm.onRemindersEnabledChange(true)
+                                    scope.launch { snackbar.showSnackbar("Erinnerungen gestartet ✅") }
+                                }
+                            } else {
+                                vm.onRemindersEnabledChange(false)
+                                scope.launch { snackbar.showSnackbar("Erinnerungen gestoppt") }
+                            }
+                        }
                     )
                 }
             }
