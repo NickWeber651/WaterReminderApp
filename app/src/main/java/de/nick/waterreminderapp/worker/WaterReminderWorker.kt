@@ -40,6 +40,7 @@ class WaterReminderWorker(
         Log.d(TAG, "▶ doWork() START – source=$source, runAttemptCount=$runAttemptCount")
 
         val settings = SettingsStore(applicationContext).settingsFlow.first()
+        val intervalMinutes = settings.intervalMinutes.toLong()
 
         val inTimeWindow = TimeWindowChecker.isAllowedNow(
             weekdayStartHour = settings.weekdayStartHour,
@@ -49,7 +50,12 @@ class WaterReminderWorker(
         )
         if (!inTimeWindow) {
             Log.d(TAG, "⏭ Außerhalb Zeitfenster → skip (hour=${timeProvider.currentHour()})")
-            rescheduleIfNeeded()
+            // Snooze-Worker ist einmalig – darf den regulären Timer nicht überschreiben
+            if (source != SOURCE_SNOOZE) {
+                rescheduleToNextWindow(settings)
+            } else {
+                Log.d(TAG, "🔄 Snooze außerhalb Zeitfenster → kein Reschedule")
+            }
             return Result.success()
         }
 
@@ -66,28 +72,58 @@ class WaterReminderWorker(
             Log.d(TAG, "🎯 Goal bereits erreicht → kein Reminder")
         }
 
-        rescheduleIfNeeded()
+        // Snooze-Worker ist ein einmaliger Reminder – darf den regulären Timer nicht überschreiben
+        if (source != SOURCE_SNOOZE) {
+            rescheduleIfNeeded(intervalMinutes)
+        } else {
+            Log.d(TAG, "🔄 Snooze-Modus → kein Reschedule (regulärer Timer läuft weiter)")
+        }
         Log.d(TAG, "✅ doWork() ENDE")
         return Result.success()
     }
 
     /**
-     * Wenn dieser Worker als OneTimeWorkRequest läuft (intervalMinutes < 15),
-     * plant er sich selbst mit dem gespeicherten Intervall neu ein.
-     * Bei PeriodicWorkRequest ist intervalMinutes == -1 → kein Reschedule nötig.
+     * Plant den nächsten Lauf genau zum Start des nächsten Zeitfensters ein.
+     * Wird aufgerufen, wenn der Worker außerhalb des Zeitfensters feuert,
+     * damit der Reminder pünktlich zum Fenster-Start kommt (z.B. 8:00 Uhr).
      */
-    private fun rescheduleIfNeeded() {
-        val intervalMinutes = inputData.getLong(KEY_INTERVAL_MINUTES, -1L)
+    private fun rescheduleToNextWindow(settings: de.nick.waterreminderapp.data.Settings) {
+        val delayMinutes = TimeWindowChecker.minutesUntilNextWindow(
+            weekdayStartHour = settings.weekdayStartHour,
+            weekendStartHour = settings.weekendStartHour,
+            endHour          = settings.endHour,
+            timeProvider     = timeProvider
+        )
+        Log.d(TAG, "⏰ Reschedule zum nächsten Zeitfenster in $delayMinutes min")
+
+        val next = OneTimeWorkRequestBuilder<WaterReminderWorker>()
+            .setInitialDelay(delayMinutes, TimeUnit.MINUTES)
+            .setInputData(workDataOf(
+                KEY_SOURCE           to "scheduled",
+                KEY_INTERVAL_MINUTES to settings.intervalMinutes.toLong()
+            ))
+            .build()
+
+        WorkManager.getInstance(applicationContext)
+            .enqueueUniqueWork(WORK_NAME_ONE_TIME, ExistingWorkPolicy.REPLACE, next)
+    }
+
+    /**
+     * Plant den nächsten Lauf nach dem konfigurierten Intervall ein.
+     * Da wir nur noch OneTimeWork verwenden (kein PeriodicWork mehr),
+     * muss sich der Worker nach jedem Lauf selbst neu einplanen.
+     */
+    private fun rescheduleIfNeeded(intervalMinutes: Long) {
         if (intervalMinutes < 1L) {
-            Log.d(TAG, "🔄 Periodic-Modus → kein manuelles Reschedule nötig")
+            Log.d(TAG, "🔄 Intervall ungültig ($intervalMinutes) → kein Reschedule")
             return
         }
 
-        Log.d(TAG, "🔄 OneTime-Modus → Reschedule in $intervalMinutes min")
+        Log.d(TAG, "🔄 Reschedule in $intervalMinutes min")
         val next = OneTimeWorkRequestBuilder<WaterReminderWorker>()
             .setInitialDelay(intervalMinutes, TimeUnit.MINUTES)
             .setInputData(workDataOf(
-                KEY_SOURCE           to inputData.getString(KEY_SOURCE),
+                KEY_SOURCE           to "scheduled",
                 KEY_INTERVAL_MINUTES to intervalMinutes
             ))
             .build()
